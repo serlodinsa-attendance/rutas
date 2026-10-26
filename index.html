@@ -369,7 +369,7 @@ function itemHTML(p, enPool) {
     '<span class="n" title="Clic para editar" onclick="editarManual(this.parentNode.getAttribute(\'data-d\'))">' + esc(p.destino) + '</span>' +
     '<span class="d">' + esc(dep) + '</span>' + (u ? '<span class="u">' + u + '</span>' : '') +
     '<button class="mv" title="Mover a otra ruta" onclick="abrirMover(this.parentNode.getAttribute(\'data-d\'))">⇄</button>' +
-    (enPool ? '' : '<button class="x" title="Quitar de la ruta" onclick="quitarDeRuta(this.parentNode.getAttribute(\'data-d\'))">✕</button>') + '</div>';
+    (enPool ? '<button class="x" title="Borrar este destino del día" onclick="borrarPedidoNombre(this.parentNode.getAttribute(\'data-d\'))">🗑</button>' : '<button class="x" title="Quitar de la ruta" onclick="quitarDeRuta(this.parentNode.getAttribute(\'data-d\'))">✕</button>') + '</div>';
 }
 function setRuta(n, campo, v) { var r = rutaObj(n); if (r) { r[campo] = v.trim(); guardarTodo(); renderRutas(); } }
 function setCap(n, i, v) { var r = rutaObj(n); if (r) { r.cap = r.cap || [0, 0, 0, 0]; r.cap[i] = num(v); guardarTodo(); renderRutas(); } }
@@ -622,6 +622,13 @@ function setDeptoPedido(i, dep) {
   autoColocar(); renderTodo(); guardarTodo();
 }
 function editU(i, c, v) { S.pedidos[i][c] = num(v); renderTodo(); guardarTodo(); }
+function borrarPedidoNombre(d) {
+  if (!confirm('¿Borrar "' + d + '" de los pedidos de hoy?')) return;
+  var k = norm(d);
+  S.pedidos = S.pedidos.filter(function (p) { return norm(p.destino) !== k; });
+  delete S.nuevos[k];
+  limpiarObsoletos(); renderTodo(); guardarTodo();
+}
 function quitarPedido(i) { var p = S.pedidos[i]; if (!confirm('¿Quitar ' + p.destino + '?')) return; S.pedidos.splice(i, 1); limpiarObsoletos(); renderTodo(); guardarTodo(); }
 function zonaDe(depto) { var z = S.cfg.zonaLog || {}; for (var k in z) if (norm(k) === norm(depto)) return z[k]; return ''; }
 function agregarNuevo(i) {
