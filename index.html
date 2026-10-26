@@ -188,6 +188,7 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
   <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="document.getElementById('mv').classList.remove('on')">Cancelar</button><button class="b" onclick="confirmarMover()">Mover</button></div></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFXnXiSkGfSr7CMNLCj0gIgUrivl9APGdE4lzzHzlycsqWB-wB7B9y7AycIZMD2a7o/exec';
 var KEY = '';
@@ -404,31 +405,45 @@ function borrarRuta(n) {
   renderTodo(); guardarTodo();
 }
 function descargarExcel() {
-  if (typeof XLSX === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
+  if (typeof ExcelJS === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
   var sa = sinAsignar(), incluir = false;
   if (sa.length) incluir = confirm('Hay ' + sa.length + ' destinos sin asignar.\n\nAceptar = incluirlos al final del archivo (sin piloto)\nCancelar = dejarlos fuera');
-  var rows = [['Codigo', 'DESTINO', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'COMENTARIO', 'Region', 'Piloto', 'placa', 'HORARIO DE POSICIONAMIENTO', 'COMPLETACIÓN DE RUTA', 'ACEPTACIÓN DE RUTA-GRUPO UMA', 'OBSERVACIONES DE LA RUTA']];
-  var res = [['Ruta', 'Piloto', 'Placa', 'Vehículo', 'Destinos', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'Observaciones']];
+  var filas = [];
   function fila(p, r, primera) {
     var d = detectar(p.destino) || {}, cod = d.codigo === undefined || d.codigo === '' ? null : d.codigo;
     if (cod !== null && /^\d+$/.test(String(cod))) cod = Number(cod);
-    return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, p.com || null, d.zona || null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null, (r && primera && r.obs) ? r.obs : null];
+    return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, p.com || null, r ? r.n : null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null, (r && primera && r.obs) ? r.obs : null];
   }
   S.rutas.forEach(function (r) {
-    if (!r.destinos.length) return;
-    var t = totalesRuta(r), prim = true;
-    r.destinos.forEach(function (dn) { var p = pedidoDe(dn); if (p) { rows.push(fila(p, r, prim)); prim = false; } });
-    res.push([r.n, r.piloto || '', r.placa || '', r.vehiculo || '', r.destinos.length, t[0], t[1], t[2], t[3], r.obs || '']);
+    var prim = true;
+    r.destinos.forEach(function (dn) { var p = pedidoDe(dn); if (p) { filas.push(fila(p, r, prim)); prim = false; } });
   });
-  if (incluir) sa.forEach(function (p) { rows.push(fila(p, null, false)); });
-  if (rows.length < 2) { alert('No hay destinos en las rutas para descargar.'); return; }
-  var wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows), ws2 = XLSX.utils.aoa_to_sheet(res);
-  ws['!cols'] = [{ wch: 14 }, { wch: 48 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 40 }];
-  ws2['!cols'] = [{ wch: 6 }, { wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 9 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 50 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'Programacion');
-  XLSX.utils.book_append_sheet(wb, ws2, 'Resumen de rutas');
+  if (incluir) sa.forEach(function (p) { filas.push(fila(p, null, false)); });
+  if (!filas.length) { alert('No hay destinos en las rutas para descargar.'); return; }
+  var wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('PROGRAMACION', { views: [{ state: 'frozen', ySplit: 1 }] });
+  var heads = ['Codigo Cliente', 'DESTINO', 'MOTOS', 'TOROS', 'QUTE', 'KAYO', 'COMENTARIO', 'RUTA', 'PILOTOS', 'PLACA', 'HORARIO DE POSICIONAMIENTO', 'COMPLETACIÓN DE RUTA', 'ACEPTACIÓN DE RUTA-GRUPO UMA', 'OBSERVACIONES'];
+  var anchos = [17, 58, 10, 10, 8, 8, 40, 9, 26, 16, 20, 18, 34, 45];
+  var bd = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  ws.addRow(heads);
+  filas.forEach(function (f) { ws.addRow(f); });
+  anchos.forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  ws.getRow(1).height = 35;
+  ws.eachRow(function (row, n) {
+    row.eachCell({ includeEmpty: true }, function (c, col) {
+      if (col > heads.length) return;
+      c.font = { name: 'Calibri', size: 11, bold: n === 1 };
+      c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      c.border = bd;
+      if (n === 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    });
+  });
   var f = new Date(), dd = ('0' + f.getDate()).slice(-2), mm = ('0' + (f.getMonth() + 1)).slice(-2);
-  XLSX.writeFile(wb, 'PROGRAMACION_' + dd + '_' + mm + '_' + f.getFullYear() + '.xlsx');
+  wb.xlsx.writeBuffer().then(function (buf) {
+    var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'PROGRAMACION_' + dd + '_' + mm + '_' + f.getFullYear() + '.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
 }
 var arrastrando = null;
 function enlazarDnD() {
