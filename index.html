@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema de Rutas UMA</title>
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e2e8f0;--pri:#2563eb;--ok:#16a34a;--bad:#dc2626;--warn:#d97706;--dark:#0f172a}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{background:var(--dark);color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:0;z-index:20}
+header h1{font-size:16px;margin:0 12px 0 0}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;color:#cbd5e1;border:none;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+nav button.on{background:#1e293b;color:#fff}
+#estado{margin-left:auto;font-size:12px;color:#94a3b8}
+main{padding:14px;max-width:1500px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+button.b{padding:8px 12px;border:none;border-radius:8px;background:var(--pri);color:#fff;font-weight:600;cursor:pointer;font-size:13px}
+button.b.sec{background:#e2e8f0;color:var(--ink)}
+button.b.ok{background:var(--ok)}button.b.bad{background:var(--bad)}
+input,select,textarea{padding:7px 9px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+textarea{width:100%;min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.bar{background:var(--card);border-radius:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.kpi{display:flex;flex-direction:column;align-items:center;min-width:56px}.kpi b{font-size:20px}.kpi span{font-size:11px;color:var(--mut)}
+.kpi.alert b{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;align-items:start}
+.ruta{background:var(--card);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;border:2px solid transparent}
+.ruta.over{border-color:var(--pri);background:#eff6ff}
+.rh{background:var(--dark);color:#fff;padding:8px 10px}
+.rh .t{display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px}
+.rh .t small{font-weight:400;color:#94a3b8}
+.rh input{width:100%;margin-bottom:4px;padding:5px 8px;font-size:13px}
+.rh .r2{display:flex;gap:4px}
+.rh .r2 input{flex:1;min-width:0}
+.tot{display:flex;gap:6px;padding:6px 10px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap}
+.tot span{background:#e2e8f0;border-radius:6px;padding:1px 7px}
+.tot span.exc{background:#fecaca;color:#991b1b;font-weight:700}
+.items{min-height:46px;padding:4px}
+.it{display:flex;align-items:center;gap:6px;padding:6px 8px;margin:3px 0;background:#fff;border:1px solid var(--line);border-radius:8px;cursor:grab}
+.it:active{cursor:grabbing}
+.it.drag{opacity:.4}
+.it.nuevo{border-color:var(--ok);background:#f0fdf4}
+.it .n{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.it .d{font-size:11px;color:var(--mut);white-space:nowrap}
+.it .u{font-size:11px;background:#dbeafe;color:#1e40af;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.it .mv,.it .x{border:none;background:#f1f5f9;border-radius:6px;cursor:pointer;padding:3px 7px;font-size:13px}
+.it .x:hover{background:#fecaca}
+.vacio{color:var(--mut);text-align:center;padding:12px;font-size:12px}
+.pool{background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:8px 10px;margin-bottom:12px}
+.pool h3{margin:0 0 6px;font-size:13px;color:#92400e}
+.pool .items{display:flex;flex-wrap:wrap;gap:4px}.pool .it{margin:0}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}
+th{background:var(--dark);color:#fff;position:sticky;top:0}
+td input[type=number]{width:62px}
+.tw{max-height:62vh;overflow:auto;border-radius:12px}
+.card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:15px}
+.mut{color:var(--mut);font-size:12px}
+.q{color:var(--bad);font-weight:700}
+.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);align-items:center;justify-content:center;padding:14px;z-index:50}
+.modal.on{display:flex}
+.modal .box{background:#fff;border-radius:14px;padding:18px;max-width:420px;width:100%;max-height:92vh;overflow:auto}
+.modal label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
+.modal input,.modal select{width:100%}
+.modal .u4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#login{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;align-items:center;justify-content:center}
+#login .box{background:#fff;padding:24px;border-radius:14px;max-width:360px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,.15)}
+.log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0f172a;color:#a7f3d0;border-radius:8px;padding:8px 10px;max-height:200px;overflow:auto;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div id="login"><div class="box"><h2 style="margin-top:0">Sistema de Rutas UMA</h2><p class="mut">Escribe la clave de acceso.</p><input id="lk" type="password" style="width:100%" placeholder="Clave"><p id="lerr" class="q"></p><button class="b" style="width:100%" onclick="entrar()">Entrar</button></div></div>
+
+<header>
+  <h1>Sistema de Rutas UMA</h1>
+  <nav id="nav">
+    <button data-v="rutas" class="on">Rutas Hoy</button>
+    <button data-v="pedidos">Pedidos</button>
+    <button data-v="dicc">Diccionario</button>
+    <button data-v="config">Configuración</button>
+  </nav>
+  <div id="estado">Cargando...</div>
+</header>
+
+<main>
+<section id="v-rutas" class="view on">
+  <div class="bar" id="totales"></div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="b ok" onclick="abrirManual()">+ Agregar destino / unidades</button>
+    <button class="b sec" onclick="nuevaRuta()">+ Ruta</button>
+    <button class="b sec" onclick="reAuto()">Acomodar pendientes por departamento</button>
+  </div>
+  <div id="pool"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="v-pedidos" class="view">
+  <div class="card">
+    <h2>Cargar pedidos del día</h2>
+    <p class="mut">Pega desde Excel las columnas: DESTINO, MOTO, TORO, QUTE, KAYO, COMENTARIO (el encabezado es opcional).</p>
+    <textarea id="paste" placeholder="Pega aquí..."></textarea>
+    <div class="row" style="margin-top:8px">
+      <label><input type="radio" name="modo" value="reemplazar" checked> Borrar los pedidos anteriores y cargar estos</label>
+      <label><input type="radio" name="modo" value="agregar"> Agregar a los existentes</label>
+      <button class="b" onclick="cargarPegado()">Cargar pedidos</button>
+    </div>
+    <p id="pmsg" class="mut"></p>
+  </div>
+  <div class="card" id="nuevos" style="display:none"></div>
+  <div class="bar" id="pkpi"></div>
+  <div class="tw"><table id="tped"></table></div>
+</section>
+
+<section id="v-dicc" class="view">
+  <div class="card">
+    <h2>Agregar destino al diccionario</h2>
+    <div class="row">
+      <input id="dd" placeholder="Destino" style="flex:2;min-width:200px">
+      <input id="dc" placeholder="Código (opcional)" style="flex:1;min-width:120px">
+      <select id="dp" style="flex:1;min-width:160px"></select>
+      <input id="dm" placeholder="Municipio tarifario (opcional)" style="flex:1;min-width:160px">
+      <button class="b ok" onclick="agregarDicc()">Agregar</button>
+    </div>
+    <p id="dmsg" class="mut"></p>
+  </div>
+  <div class="row" style="margin-bottom:8px"><input id="dq" placeholder="Buscar en el diccionario..." style="flex:1;max-width:420px"><span class="mut" id="dcount"></span></div>
+  <div class="tw"><table id="tdicc"></table></div>
+</section>
+
+<section id="v-config" class="view">
+  <div class="card">
+    <h2>Importar desde tu Excel</h2>
+    <p class="mut">Elige tu archivo SISTEMA_RUTAS (.xlsx). Se cargan el Diccionario, el Directorio de tiendas, el Tarifario, el Historial y las zonas. Sirve para la primera vez y cuando el cliente te mande una versión actualizada.</p>
+    <div class="row">
+      <input type="file" id="xl" accept=".xlsx,.xls">
+      <label><input type="checkbox" id="xdic" checked> Diccionario</label>
+      <label><input type="checkbox" id="xdir" checked> Directorio</label>
+      <label><input type="checkbox" id="xtar" checked> Tarifario</label>
+      <label><input type="checkbox" id="xhis" checked> Historial</label>
+      <button class="b" onclick="importarExcel()">Importar</button>
+    </div>
+    <p class="mut">Al importar una tabla, reemplaza la que ya está guardada.</p>
+    <div class="log" id="xlog" style="display:none"></div>
+  </div>
+  <div class="card">
+    <h2>Departamentos, rutas y zonas (editable)</h2>
+    <p class="mut">Cada departamento va a una ruta fija. Cambia el número de ruta, la zona, el nombre, o agrega y quita departamentos. Los cambios aplican a los pedidos que aún no están en una ruta; lo que ya acomodaste no se mueve.</p>
+    <table id="tdep"></table>
+    <div class="row" style="margin-top:8px"><button class="b sec" onclick="agregarFilaDepto()">+ Departamento</button><button class="b ok" onclick="guardarDeptos()">Guardar departamentos</button><span id="depmsg" class="mut"></span></div>
+  </div>
+  <div class="card">
+    <h2>Estado de los datos</h2>
+    <div id="stats" class="mut"></div>
+    <p><a id="hojaLink" href="#" target="_blank" rel="noopener">Abrir la hoja de Google con todos los datos</a></p>
+  </div>
+</section>
+</main>
+
+<div class="modal" id="mm"><div class="box">
+  <h2 id="mt" style="margin-top:0">Agregar destino</h2>
+  <label>Destino</label><input id="m_d" list="dl" autocomplete="off">
+  <datalist id="dl"></datalist>
+  <div class="u4">
+    <div><label>MOTO</label><input id="m_m" type="number" min="0" value="0"></div>
+    <div><label>TORO</label><input id="m_t" type="number" min="0" value="0"></div>
+    <div><label>QUTE</label><input id="m_q" type="number" min="0" value="0"></div>
+    <div><label>KAYO</label><input id="m_k" type="number" min="0" value="0"></div>
+  </div>
+  <label>Comentario</label><input id="m_c">
+  <label>Ruta</label><select id="m_r"></select>
+  <label id="m_sl" style="display:none"><input type="checkbox" id="m_s"> Sumar a las unidades que ya tiene (si no, se reemplazan)</label>
+  <p id="m_msg" class="q"></p>
+  <div class="row" style="justify-content:flex-end;margin-top:8px">
+    <button class="b bad" id="m_del" style="display:none;margin-right:auto" onclick="borrarManual()">Quitar pedido</button>
+    <button class="b sec" onclick="cerrarManual()">Cancelar</button>
+    <button class="b" onclick="guardarManual()">Guardar</button>
+  </div>
+</div></div>
+
+<div class="modal" id="mv"><div class="box"><h2 style="margin-top:0" id="mvt">Mover a</h2><select id="mvs" size="8" style="width:100%"></select>
+  <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="document.getElementById('mv').classList.remove('on')">Cancelar</button><button class="b" onclick="confirmarMover()">Mover</button></div></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+var API_URL = 'https://script.google.com/macros/s/AKfycbwFXnXiSkGfSr7CMNLCj0gIgUrivl9APGdE4lzzHzlycsqWB-wB7B9y7AycIZMD2a7o/exec';
+var KEY = '';
+var S = { dicc: [], dmap: {}, pedidos: [], rutas: [], cfg: {}, stats: {}, hoja: '', nuevos: {} };
+var $ = function (i) { return document.getElementById(i); };
+
+function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function num(v) { var n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) || n < 0 ? 0 : n; }
+function setEstado(t, c) { var e = $('estado'); e.textContent = t; e.style.color = c || '#94a3b8'; }
+
+function api(fn) {
+  var args = [].slice.call(arguments, 1);
+  return fetch(API_URL, { method: 'POST', body: JSON.stringify({ fn: fn, args: [KEY].concat(args) }) })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j.error) throw new Error(j.error); return j.result; });
+}
+
+function entrar() {
+  KEY = $('lk').value.trim();
+  if (!KEY) return;
+  $('lerr').textContent = '';
+  cargar().then(function () {
+    try { localStorage.setItem('rutas_key', KEY); } catch (e) {}
+    $('login').style.display = 'none';
+  }).catch(function (e) { $('lerr').textContent = e.message; $('login').style.display = 'flex'; });
+}
+function arranque() {
+  var q = new URLSearchParams(location.search).get('key');
+  var k = q || '';
+  if (!k) { try { k = localStorage.getItem('rutas_key') || ''; } catch (e) {} }
+  if (k) { $('lk').value = k; KEY = k; cargar().then(function () { try { localStorage.setItem('rutas_key', KEY); } catch (e) {} if (q) history.replaceState(null, '', location.pathname); }).catch(function () { $('login').style.display = 'flex'; }); }
+  else $('login').style.display = 'flex';
+}
+
+function indexarDicc() {
+  S.dmap = {};
+  S.dicc.forEach(function (r, i) { var k = norm(r[0]); if (k && !(k in S.dmap)) S.dmap[k] = i; });
+}
+function cargar() {
+  setEstado('Cargando...');
+  return api('cargar').then(function (r) {
+    S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
+    S.rutas = (r.rutas || []).sort(function (a, b) { return a.n - b.n; });
+    indexarDicc();
+    limpiarObsoletos();
+    var cambio = autoColocar();
+    renderTodo();
+    setEstado('Listo', '#86efac');
+    if (cambio) guardarTodo();
+  }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); throw e; });
+}
+var tGuardar = null, guardando = false, pendiente = false;
+function guardarTodo() {
+  clearTimeout(tGuardar); setEstado('Guardando...', '#fde68a');
+  tGuardar = setTimeout(enviar, 700);
+}
+function enviar() {
+  if (guardando) { pendiente = true; return; }
+  guardando = true;
+  api('guardarTodo', S.pedidos, S.rutas).then(function () {
+    guardando = false;
+    if (pendiente) { pendiente = false; enviar(); } else setEstado('Guardado', '#86efac');
+  }).catch(function (e) { guardando = false; setEstado('Error al guardar: ' + e.message, '#fca5a5'); });
+}
+
+function detectar(destino) {
+  var i = S.dmap[norm(destino)];
+  if (i === undefined) return null;
+  var r = S.dicc[i];
+  return { codigo: r[1], depto: r[2], zona: r[3], muni: r[5] };
+}
+function deptoDe(destino) { var d = detectar(destino); return d && d.depto ? d.depto : ''; }
+function rutaPorDepto(depto) {
+  var zr = S.cfg.zonaRuta || {};
+  for (var k in zr) if (norm(k) === norm(depto)) return Number(zr[k]);
+  return 0;
+}
+function rutaObj(n, crear) {
+  for (var i = 0; i < S.rutas.length; i++) if (S.rutas[i].n === n) return S.rutas[i];
+  if (!crear) return null;
+  var r = { n: n, piloto: '', placa: '', vehiculo: '', destinos: [], cap: [0, 0, 0, 0] };
+  S.rutas.push(r); S.rutas.sort(function (a, b) { return a.n - b.n; });
+  return r;
+}
+function rutaDe(destino) {
+  var k = norm(destino);
+  for (var i = 0; i < S.rutas.length; i++) for (var j = 0; j < S.rutas[i].destinos.length; j++) if (norm(S.rutas[i].destinos[j]) === k) return S.rutas[i];
+  return null;
+}
+function pedidoDe(destino) { var k = norm(destino); for (var i = 0; i < S.pedidos.length; i++) if (norm(S.pedidos[i].destino) === k) return S.pedidos[i]; return null; }
+function limpiarObsoletos() {
+  S.rutas.forEach(function (r) { r.destinos = r.destinos.filter(function (d) { return pedidoDe(d); }); });
+}
+function sugerir(destino) {
+  var depto = deptoDe(destino);
+  if (!depto) return 0;
+  var n = rutaPorDepto(depto);
+  if (!n) return 0;
+  if (norm(depto) === 'guatemala') {
+    var r1 = rutaObj(1);
+    var cnt = 0;
+    if (r1) r1.destinos.forEach(function (d) { if (norm(deptoDe(d)) === 'guatemala') cnt++; });
+    return cnt < 26 ? 1 : 2;
+  }
+  return n;
+}
+function autoColocar() {
+  var cambio = false;
+  S.pedidos.forEach(function (p) {
+    if (rutaDe(p.destino)) return;
+    var n = sugerir(p.destino);
+    if (!n) return;
+    rutaObj(n, true).destinos.push(p.destino);
+    S.nuevos[norm(p.destino)] = 1;
+    cambio = true;
+  });
+  return cambio;
+}
+function reAuto() { if (autoColocar()) { renderTodo(); guardarTodo(); } else alert('No hay pedidos pendientes con departamento conocido.'); }
+function sinAsignar() { return S.pedidos.filter(function (p) { return !rutaDe(p.destino); }); }
+
+function totalesRuta(r) {
+  var t = [0, 0, 0, 0];
+  r.destinos.forEach(function (d) { var p = pedidoDe(d); if (p) { t[0] += p.m; t[1] += p.t; t[2] += p.q; t[3] += p.k; } });
+  return t;
+}
+function renderRutas() {
+  var tot = [0, 0, 0, 0], arm = 0;
+  S.rutas.forEach(function (r) { var t = totalesRuta(r); for (var i = 0; i < 4; i++) tot[i] += t[i]; arm += r.destinos.length; });
+  var sa = sinAsignar();
+  $('totales').innerHTML =
+    '<div class="kpi"><b>' + tot[0] + '</b><span>MOTO</span></div><div class="kpi"><b>' + tot[1] + '</b><span>TORO</span></div>' +
+    '<div class="kpi"><b>' + tot[2] + '</b><span>QUTE</span></div><div class="kpi"><b>' + tot[3] + '</b><span>KAYO</span></div>' +
+    '<div class="kpi"><b>' + arm + '</b><span>destinos armados</span></div><div class="kpi"><b>' + S.pedidos.length + '</b><span>pedidos de hoy</span></div>' +
+    '<div class="kpi ' + (sa.length ? 'alert' : '') + '"><b>' + sa.length + '</b><span>sin asignar</span></div>';
+  if (sa.length) {
+    $('pool').innerHTML = '<div class="pool" data-ruta="0"><h3>SIN ASIGNAR (' + sa.length + ') — arrástralos a una ruta o usa ⇄. Si dicen ❓, agrégalos al diccionario en la pestaña Pedidos.</h3><div class="items" data-ruta="0">' +
+      sa.map(function (p) { return itemHTML(p, true); }).join('') + '</div></div>';
+  } else $('pool').innerHTML = '';
+  $('grid').innerHTML = S.rutas.map(function (r) {
+    var t = totalesRuta(r), c = r.cap || [0, 0, 0, 0];
+    var chip = function (n, v, cap) { return '<span class="' + (cap && v > cap ? 'exc' : '') + '">' + n + ' ' + v + (cap ? '/' + cap : '') + '</span>'; };
+    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span>RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos</small></div>' +
+      '<input placeholder="Piloto" list="pilotos" value="' + esc(r.piloto) + '" onchange="setRuta(' + r.n + ',\'piloto\',this.value)">' +
+      '<div class="r2"><input placeholder="Placa" value="' + esc(r.placa) + '" onchange="setRuta(' + r.n + ',\'placa\',this.value)">' +
+      '<input placeholder="Vehículo" value="' + esc(r.vehiculo) + '" onchange="setRuta(' + r.n + ',\'vehiculo\',this.value)"></div>' +
+      '<div class="r2" style="margin-top:4px"><input type="number" min="0" title="Capacidad MOTO" placeholder="Cap M" value="' + (c[0] || '') + '" onchange="setCap(' + r.n + ',0,this.value)">' +
+      '<input type="number" min="0" title="Capacidad TORO" placeholder="Cap T" value="' + (c[1] || '') + '" onchange="setCap(' + r.n + ',1,this.value)">' +
+      '<input type="number" min="0" title="Capacidad QUTE" placeholder="Cap Q" value="' + (c[2] || '') + '" onchange="setCap(' + r.n + ',2,this.value)">' +
+      '<input type="number" min="0" title="Capacidad KAYO" placeholder="Cap K" value="' + (c[3] || '') + '" onchange="setCap(' + r.n + ',3,this.value)"></div></div>' +
+      '<div class="tot">' + chip('M', t[0], c[0]) + chip('T', t[1], c[1]) + chip('Q', t[2], c[2]) + chip('K', t[3], c[3]) + '</div>' +
+      '<div class="items" data-ruta="' + r.n + '">' + (r.destinos.length ? r.destinos.map(function (d) { var p = pedidoDe(d); return p ? itemHTML(p, false) : ''; }).join('') : '<div class="vacio">Arrastra destinos aquí</div>') + '</div></div>';
+  }).join('');
+  var pil = {}; S.rutas.forEach(function (r) { if (r.piloto) pil[r.piloto] = 1; });
+  if (!$('pilotos')) { var dl = document.createElement('datalist'); dl.id = 'pilotos'; document.body.appendChild(dl); }
+  $('pilotos').innerHTML = Object.keys(pil).map(function (p) { return '<option value="' + esc(p) + '">'; }).join('');
+  enlazarDnD();
+}
+function itemHTML(p, enPool) {
+  var d = detectar(p.destino), dep = d && d.depto ? d.depto : '❓ Nuevo';
+  var u = [p.m ? 'M ' + p.m : '', p.t ? 'T ' + p.t : '', p.q ? 'Q ' + p.q : '', p.k ? 'K ' + p.k : ''].filter(Boolean).join(' · ');
+  return '<div class="it ' + (S.nuevos[norm(p.destino)] && !enPool ? 'nuevo' : '') + '" draggable="true" data-d="' + esc(p.destino) + '">' +
+    '<span class="n" title="Clic para editar" onclick="editarManual(this.parentNode.getAttribute(\'data-d\'))">' + esc(p.destino) + '</span>' +
+    '<span class="d">' + esc(dep) + '</span>' + (u ? '<span class="u">' + u + '</span>' : '') +
+    '<button class="mv" title="Mover a otra ruta" onclick="abrirMover(this.parentNode.getAttribute(\'data-d\'))">⇄</button>' +
+    (enPool ? '' : '<button class="x" title="Quitar de la ruta" onclick="quitarDeRuta(this.parentNode.getAttribute(\'data-d\'))">✕</button>') + '</div>';
+}
+function setRuta(n, campo, v) { var r = rutaObj(n); if (r) { r[campo] = v.trim(); guardarTodo(); renderRutas(); } }
+function setCap(n, i, v) { var r = rutaObj(n); if (r) { r.cap = r.cap || [0, 0, 0, 0]; r.cap[i] = num(v); guardarTodo(); renderRutas(); } }
+function nuevaRuta() {
+  var usados = {}; S.rutas.forEach(function (r) { usados[r.n] = 1; });
+  for (var n = 1; n <= 30; n++) if (!usados[n]) { rutaObj(n, true); break; }
+  renderTodo(); guardarTodo();
+}
+function quitarDeRuta(d) { var r = rutaDe(d); if (r) { r.destinos = r.destinos.filter(function (x) { return norm(x) !== norm(d); }); renderTodo(); guardarTodo(); } }
+function moverA(d, n, antesDe) {
+  var r0 = rutaDe(d);
+  if (r0) r0.destinos = r0.destinos.filter(function (x) { return norm(x) !== norm(d); });
+  if (n > 0) {
+    var r = rutaObj(n, true), idx = -1;
+    if (antesDe) for (var i = 0; i < r.destinos.length; i++) if (norm(r.destinos[i]) === norm(antesDe)) idx = i;
+    if (idx >= 0) r.destinos.splice(idx, 0, d); else r.destinos.push(d);
+  }
+  delete S.nuevos[norm(d)];
+  renderTodo(); guardarTodo();
+}
+var arrastrando = null;
+function enlazarDnD() {
+  document.querySelectorAll('.it').forEach(function (el) {
+    el.addEventListener('dragstart', function (e) { arrastrando = el.getAttribute('data-d'); el.classList.add('drag'); try { e.dataTransfer.setData('text/plain', arrastrando); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} });
+    el.addEventListener('dragend', function () { el.classList.remove('drag'); document.querySelectorAll('.over').forEach(function (o) { o.classList.remove('over'); }); });
+    el.addEventListener('dragover', function (e) { e.preventDefault(); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var cont = el.closest('[data-ruta]'); var n = cont ? Number(cont.getAttribute('data-ruta')) : 0;
+      if (arrastrando && arrastrando !== el.getAttribute('data-d')) moverA(arrastrando, n, el.getAttribute('data-d'));
+      arrastrando = null;
+    });
+  });
+  document.querySelectorAll('.items[data-ruta], .ruta').forEach(function (z) {
+    z.addEventListener('dragover', function (e) { e.preventDefault(); var t = z.closest('.ruta') || z; t.classList.add('over'); });
+    z.addEventListener('dragleave', function () { var t = z.closest('.ruta') || z; t.classList.remove('over'); });
+    z.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var n = Number((z.closest('[data-ruta]') || z).getAttribute('data-ruta'));
+      if (arrastrando) moverA(arrastrando, n, null);
+      arrastrando = null;
+    });
+  });
+}
+var moviendo = '';
+function abrirMover(d) {
+  moviendo = d; $('mvt').textContent = 'Mover "' + d + '" a:';
+  var o = '<option value="0">— Sin asignar —</option>';
+  var usados = {}; S.rutas.forEach(function (r) { usados[r.n] = 1; });
+  S.rutas.forEach(function (r) { o += '<option value="' + r.n + '">Ruta ' + r.n + (r.piloto ? ' — ' + esc(r.piloto) : '') + ' (' + r.destinos.length + ')</option>'; });
+  for (var n = 1; n <= 30; n++) if (!usados[n]) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; break; }
+  $('mvs').innerHTML = o;
+  var r0 = rutaDe(d); $('mvs').value = r0 ? String(r0.n) : '0';
+  $('mv').classList.add('on');
+}
+function confirmarMover() { $('mv').classList.remove('on'); moverA(moviendo, Number($('mvs').value), null); }
+
+var editando = '';
+function opcionesRuta(sel) {
+  var o = '<option value="0">Automática (por departamento)</option>';
+  var usados = {}; S.rutas.forEach(function (r) { usados[r.n] = 1; o += '<option value="' + r.n + '">Ruta ' + r.n + (r.piloto ? ' — ' + esc(r.piloto) : '') + '</option>'; });
+  for (var n = 1; n <= 30; n++) if (!usados[n]) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; break; }
+  $('m_r').innerHTML = o; if (sel !== undefined) $('m_r').value = String(sel);
+}
+function abrirManual() {
+  editando = ''; $('mt').textContent = 'Agregar destino / unidades';
+  $('m_d').value = ''; $('m_d').disabled = false; ['m_m', 'm_t', 'm_q', 'm_k'].forEach(function (i) { $(i).value = 0; }); $('m_c').value = '';
+  $('dl').innerHTML = S.dicc.slice(0, 3000).map(function (r) { return '<option value="' + esc(r[0]) + '">'; }).join('');
+  opcionesRuta(0); $('m_sl').style.display = 'block'; $('m_s').checked = true; $('m_del').style.display = 'none'; $('m_msg').textContent = '';
+  $('mm').classList.add('on'); $('m_d').focus();
+}
+function editarManual(d) {
+  var p = pedidoDe(d); if (!p) return;
+  editando = p.destino; $('mt').textContent = 'Editar pedido';
+  $('m_d').value = p.destino; $('m_d').disabled = true; $('m_m').value = p.m; $('m_t').value = p.t; $('m_q').value = p.q; $('m_k').value = p.k; $('m_c').value = p.com || '';
+  var r = rutaDe(p.destino); opcionesRuta(r ? r.n : 0);
+  $('m_sl').style.display = 'none'; $('m_s').checked = false; $('m_del').style.display = 'inline-block'; $('m_msg').textContent = '';
+  $('mm').classList.add('on');
+}
+function cerrarManual() { $('mm').classList.remove('on'); }
+function guardarManual() {
+  var d = $('m_d').value.trim();
+  if (!d) { $('m_msg').textContent = 'Escribe el destino.'; return; }
+  var u = [num($('m_m').value), num($('m_t').value), num($('m_q').value), num($('m_k').value)];
+  if (!u[0] && !u[1] && !u[2] && !u[3]) { $('m_msg').textContent = 'Pon al menos una unidad.'; return; }
+  var p = pedidoDe(d), nRuta = Number($('m_r').value);
+  if (p) {
+    if (!editando && $('m_s').checked) { p.m += u[0]; p.t += u[1]; p.q += u[2]; p.k += u[3]; }
+    else { p.m = u[0]; p.t = u[1]; p.q = u[2]; p.k = u[3]; }
+    if ($('m_c').value.trim()) p.com = $('m_c').value.trim();
+  } else {
+    var dd = S.dmap[norm(d)]; if (dd !== undefined) d = S.dicc[dd][0];
+    p = { destino: d, m: u[0], t: u[1], q: u[2], k: u[3], com: $('m_c').value.trim() };
+    S.pedidos.push(p);
+  }
+  if (nRuta > 0) { var r0 = rutaDe(p.destino); if (!r0 || r0.n !== nRuta) moverA(p.destino, nRuta, null); }
+  else if (!rutaDe(p.destino)) { var n = sugerir(p.destino); if (n) { rutaObj(n, true).destinos.push(p.destino); S.nuevos[norm(p.destino)] = 1; } }
+  cerrarManual(); renderTodo(); guardarTodo();
+}
+function borrarManual() {
+  if (!editando || !confirm('¿Quitar este pedido de hoy?')) return;
+  S.pedidos = S.pedidos.filter(function (p) { return norm(p.destino) !== norm(editando); });
+  limpiarObsoletos(); cerrarManual(); renderTodo(); guardarTodo();
+}
+
+function cargarPegado() {
+  var txt = $('paste').value.replace(/\r/g, '');
+  var lineas = txt.split('\n').filter(function (l) { return l.trim() !== ''; });
+  if (!lineas.length) { $('pmsg').textContent = 'No hay nada pegado.'; return; }
+  var filas = lineas.map(function (l) { return l.indexOf('\t') >= 0 ? l.split('\t') : l.split(/;|,(?=\s*\d|\s*$)/); });
+  var h = filas[0];
+  if (h[0] && /destino/i.test(h[0])) filas.shift();
+  else if (h.length > 1 && isNaN(parseInt(h[1], 10)) && h[1].trim() !== '' && /moto|toro|qute|kayo/i.test(h.join(' '))) filas.shift();
+  var nuevos = [], ign = 0;
+  filas.forEach(function (c) {
+    var d = (c[0] || '').trim(); if (!d) { ign++; return; }
+    var dd = S.dmap[norm(d)]; if (dd !== undefined) d = S.dicc[dd][0];
+    nuevos.push({ destino: d, m: num(c[1]), t: num(c[2]), q: num(c[3]), k: num(c[4]), com: (c[5] || '').trim() });
+  });
+  if (!nuevos.length) { $('pmsg').textContent = 'No se encontraron pedidos.'; return; }
+  var modo = document.querySelector('input[name=modo]:checked').value;
+  if (modo === 'reemplazar') {
+    if (S.pedidos.length && !confirm('Esto borra los ' + S.pedidos.length + ' pedidos anteriores y las rutas se arman de nuevo con los nuevos. ¿Continuar?')) return;
+    S.pedidos = nuevos; S.rutas.forEach(function (r) { r.destinos = []; }); S.nuevos = {};
+  } else {
+    nuevos.forEach(function (n) { var p = pedidoDe(n.destino); if (p) { p.m += n.m; p.t += n.t; p.q += n.q; p.k += n.k; if (n.com) p.com = n.com; } else S.pedidos.push(n); });
+  }
+  autoColocar();
+  $('paste').value = ''; $('pmsg').textContent = 'Listo: ' + nuevos.length + ' pedidos cargados' + (ign ? ' (' + ign + ' líneas ignoradas)' : '') + '.';
+  renderTodo(); guardarTodo();
+}
+function deptos() { return Object.keys(S.cfg.zonaRuta || {}); }
+function renderPedidos() {
+  var nv = S.pedidos.filter(function (p) { return !detectar(p.destino); });
+  var box = $('nuevos');
+  if (nv.length) {
+    var opts = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
+    box.style.display = 'block';
+    box.innerHTML = '<h2>🆕 Destinos nuevos (' + nv.length + ')</h2><p class="mut">No están en el diccionario. Elige el departamento y agrégalos: quedan guardados para siempre y los pedidos se acomodan solos en su ruta.</p>' +
+      nv.map(function (p, i) { return '<div class="row" style="margin:4px 0"><b style="flex:2;min-width:180px">' + esc(p.destino) + '</b><select id="nd' + i + '" style="min-width:170px">' + opts + '</select><button class="b ok" onclick="agregarNuevo(' + i + ')">Agregar</button></div>'; }).join('');
+    box._lista = nv;
+  } else { box.style.display = 'none'; box.innerHTML = ''; }
+  var tot = [0, 0, 0, 0]; S.pedidos.forEach(function (p) { tot[0] += p.m; tot[1] += p.t; tot[2] += p.q; tot[3] += p.k; });
+  $('pkpi').innerHTML = '<div class="kpi"><b>' + S.pedidos.length + '</b><span>pedidos</span></div><div class="kpi"><b>' + tot[0] + '</b><span>MOTO</span></div><div class="kpi"><b>' + tot[1] + '</b><span>TORO</span></div><div class="kpi"><b>' + tot[2] + '</b><span>QUTE</span></div><div class="kpi"><b>' + tot[3] + '</b><span>KAYO</span></div>';
+  $('tped').innerHTML = '<tr><th>Destino</th><th>Departamento</th><th>MOTO</th><th>TORO</th><th>QUTE</th><th>KAYO</th><th>Comentario</th><th>Ruta</th><th></th></tr>' +
+    S.pedidos.map(function (p, i) {
+      var d = detectar(p.destino), r = rutaDe(p.destino);
+      return '<tr><td>' + esc(p.destino) + '</td><td>' + (d && d.depto ? esc(d.depto) : '<span class="q">❓ Nuevo</span>') + '</td>' +
+        ['m', 't', 'q', 'k'].map(function (c) { return '<td><input type="number" min="0" value="' + p[c] + '" onchange="editU(' + i + ',\'' + c + '\',this.value)"></td>'; }).join('') +
+        '<td>' + esc(p.com || '') + '</td><td>' + (r ? 'Ruta ' + r.n : '—') + '</td><td><button class="b sec" onclick="quitarPedido(' + i + ')">✕</button></td></tr>';
+    }).join('');
+}
+function editU(i, c, v) { S.pedidos[i][c] = num(v); renderTodo(); guardarTodo(); }
+function quitarPedido(i) { var p = S.pedidos[i]; if (!confirm('¿Quitar ' + p.destino + '?')) return; S.pedidos.splice(i, 1); limpiarObsoletos(); renderTodo(); guardarTodo(); }
+function zonaDe(depto) { var z = S.cfg.zonaLog || {}; for (var k in z) if (norm(k) === norm(depto)) return z[k]; return ''; }
+function agregarNuevo(i) {
+  var p = $('nuevos')._lista[i], dep = $('nd' + i).value;
+  if (!dep) { alert('Elige el departamento.'); return; }
+  S.dicc.push([p.destino, '', dep, zonaDe(dep), '', '']); indexarDicc();
+  setEstado('Guardando...', '#fde68a');
+  api('agregarDiccionario', [[p.destino, '', dep, zonaDe(dep), '', '']]).then(function () { S.stats.diccionario = (S.stats.diccionario || 0) + 1; setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  autoColocar(); renderTodo(); guardarTodo();
+}
+
+function renderDicc() {
+  var sel = $('dp'); if (!sel.options.length) sel.innerHTML = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
+  var q = norm($('dq').value), res = [];
+  for (var i = 0; i < S.dicc.length && res.length < 200; i++) { var r = S.dicc[i]; if (!q || norm(r[0]).indexOf(q) >= 0 || norm(r[1]).indexOf(q) >= 0 || norm(r[2]).indexOf(q) >= 0) res.push(r); }
+  $('dcount').textContent = S.dicc.length + ' destinos en total' + (res.length === 200 ? ' (mostrando 200)' : '');
+  var dl = deptos();
+  $('tdicc').innerHTML = '<tr><th>Destino</th><th>Código</th><th>Departamento (editable)</th><th>Zona</th><th>Municipio tarifario</th></tr>' +
+    res.map(function (r) {
+      var i = S.dicc.indexOf(r), o = dl.slice();
+      if (r[2] && o.indexOf(r[2]) < 0) o.push(r[2]);
+      var sel = '<option value=""></option>' + o.map(function (d) { return '<option' + (d === r[2] ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('');
+      return '<tr><td>' + esc(r[0]) + '</td><td><input style="width:90px" value="' + esc(r[1]) + '" onchange="editDicc(' + i + ',1,this.value)"></td>' +
+        '<td><select onchange="editDicc(' + i + ',2,this.value)">' + sel + '</select></td><td>' + esc(r[3]) + '</td>' +
+        '<td><input value="' + esc(r[5]) + '" onchange="editDicc(' + i + ',5,this.value)"></td></tr>';
+    }).join('');
+}
+function editDicc(i, col, v) {
+  var r = S.dicc[i]; if (!r) return;
+  r[col] = v.trim();
+  if (col === 2) r[3] = zonaDe(r[2]);
+  setEstado('Guardando...', '#fde68a');
+  api('agregarDiccionario', [r]).then(function () { setEstado('Guardado', '#86efac'); if (col === 2) { autoColocar(); renderTodo(); guardarTodo(); } }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+}
+
+function renderDeptos() {
+  var zr = S.cfg.zonaRuta || {}, zl = S.cfg.zonaLog || {};
+  var filas = Object.keys(zr).map(function (d) { return [d, zr[d], zl[d] || '']; });
+  $('tdep').innerHTML = '<tr><th>Departamento</th><th>Ruta fija</th><th>Zona logística</th><th></th></tr>' + filas.map(depFila).join('');
+}
+function depFila(f) {
+  return '<tr class="drow"><td><input class="dn" data-old="' + esc(f[0]) + '" value="' + esc(f[0]) + '"></td><td><input class="dr" type="number" min="1" style="width:70px" value="' + esc(f[1]) + '"></td>' +
+    '<td><input class="dz" style="width:100%" value="' + esc(f[2]) + '"></td><td><button class="b sec" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>';
+}
+function agregarFilaDepto() { $('tdep').insertAdjacentHTML('beforeend', depFila(['', '', ''])); }
+function guardarDeptos() {
+  var zr = {}, zl = {}, ren = {};
+  document.querySelectorAll('#tdep .drow').forEach(function (tr) {
+    var n = tr.querySelector('.dn').value.trim(), old = tr.querySelector('.dn').getAttribute('data-old');
+    var r = Number(tr.querySelector('.dr').value), z = tr.querySelector('.dz').value.trim();
+    if (!n) return;
+    if (!r || r < 1) { $('depmsg').textContent = 'Pon el número de ruta de ' + n + '.'; zr = null; return; }
+    if (zr) { zr[n] = r; zl[n] = z; if (old && old !== n) ren[old] = n; }
+  });
+  if (!zr) return;
+  S.cfg.zonaRuta = zr; S.cfg.zonaLog = zl;
+  S.dicc.forEach(function (row) {
+    if (ren[row[2]]) row[2] = ren[row[2]];
+    var z = zonaDe(row[2]); if (row[2] && z && row[3] !== z) row[3] = z;
+  });
+  $('depmsg').textContent = 'Guardando...';
+  api('guardarConfig', { zonaRuta: zr, zonaLog: zl }).then(function () {
+    var cuerpo = Object.keys(ren).length ? S.dicc.filter(function (r) { return Object.keys(ren).some(function (o) { return ren[o] === r[2]; }); }) : [];
+    var p = Promise.resolve();
+    for (var i = 0; i < cuerpo.length; i += 400) (function (ini) { p = p.then(function () { return api('agregarDiccionario', cuerpo.slice(ini, ini + 400)); }); })(i);
+    return p;
+  }).then(function () {
+    $('depmsg').textContent = 'Guardado ✔';
+    autoColocar(); renderTodo(); guardarTodo();
+  }).catch(function (e) { $('depmsg').textContent = 'Error: ' + e.message; });
+}
+function agregarDicc() {
+  var d = $('dd').value.trim(), dep = $('dp').value;
+  if (!d || !dep) { $('dmsg').textContent = 'Escribe el destino y elige el departamento.'; return; }
+  var fila = [d, $('dc').value.trim(), dep, zonaDe(dep), '', $('dm').value.trim()];
+  var i = S.dmap[norm(d)]; if (i !== undefined) S.dicc[i] = fila; else S.dicc.push(fila);
+  indexarDicc();
+  api('agregarDiccionario', [fila]).then(function () { $('dmsg').textContent = 'Guardado: ' + d; ['dd', 'dc', 'dm'].forEach(function (x) { $(x).value = ''; }); autoColocar(); renderTodo(); guardarTodo(); }).catch(function (e) { $('dmsg').textContent = 'Error: ' + e.message; });
+}
+
+function log(t) { var l = $('xlog'); l.style.display = 'block'; l.textContent += t + '\n'; l.scrollTop = l.scrollHeight; }
+function hoja(wb, nombre) { for (var i = 0; i < wb.SheetNames.length; i++) if (norm(wb.SheetNames[i]) === norm(nombre)) return wb.Sheets[wb.SheetNames[i]]; return null; }
+function filasDe(ws, cols, desde) {
+  var rng = XLSX.utils.decode_range(ws['!ref']), out = [];
+  for (var r = desde; r <= rng.e.r; r++) {
+    var fila = cols.map(function (c) { var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })]; var v = cell ? cell.v : ''; return v === undefined || v === null ? '' : (typeof v === 'number' ? v : String(v).trim()); });
+    if (fila[0] === '' ) continue;
+    out.push(fila);
+  }
+  return out;
+}
+function enviarEnTrozos(nombre, filas) {
+  var tam = 400, p = Promise.resolve();
+  for (var i = 0; i < filas.length; i += tam) (function (ini) {
+    p = p.then(function () { log('  ' + nombre + ': ' + Math.min(ini + tam, filas.length) + '/' + filas.length); return api('importarTabla', nombre, filas.slice(ini, ini + tam), ini === 0); });
+  })(i);
+  if (!filas.length) p = p.then(function () { return api('importarTabla', nombre, [], true); });
+  return p;
+}
+function importarExcel() {
+  var f = $('xl').files[0]; if (!f) { alert('Elige tu archivo Excel.'); return; }
+  $('xlog').textContent = ''; log('Leyendo ' + f.name + '...');
+  var fr = new FileReader();
+  fr.onload = function (e) {
+    var wb; try { wb = XLSX.read(e.target.result, { type: 'array' }); } catch (x) { log('No se pudo leer el archivo: ' + x.message); return; }
+    var cadena = Promise.resolve();
+    var dic = hoja(wb, 'Diccionario_Destinos');
+    if (dic) {
+      var zr = {}, zl = {};
+      var rng = XLSX.utils.decode_range(dic['!ref']);
+      for (var r = 3; r <= Math.min(rng.e.r, 40); r++) {
+        var g = function (c) { var cell = dic[XLSX.utils.encode_cell({ r: r, c: c })]; return cell && cell.v !== undefined ? String(cell.v).trim() : ''; };
+        if (g(12) && g(13)) zl[g(12)] = g(13);
+        if (g(15) && g(16) && !isNaN(Number(g(16)))) zr[g(15)] = Number(g(16));
+      }
+      if (Object.keys(zr).length) { log('Zonas: ' + Object.keys(zr).length + ' departamentos'); cadena = cadena.then(function () { return api('guardarConfig', { zonaRuta: zr, zonaLog: zl }); }); }
+      if ($('xdic').checked) { var fd = filasDe(dic, [0, 1, 2, 3, 4, 5], 4); log('Diccionario: ' + fd.length + ' destinos'); cadena = cadena.then(function () { return enviarEnTrozos('Diccionario', fd); }); }
+    } else log('(No encontré la hoja Diccionario_Destinos)');
+    var dir = hoja(wb, 'Directorio_Tiendas');
+    if (dir && $('xdir').checked) { var fi = filasDe(dir, [0, 1, 2, 3, 4, 5, 6, 7, 8], 4); log('Directorio: ' + fi.length + ' tiendas'); cadena = cadena.then(function () { return enviarEnTrozos('Directorio', fi); }); }
+    var tar = hoja(wb, 'Tarifario');
+    if (tar && $('xtar').checked) { var ft = filasDe(tar, [0, 1, 2, 3, 4], 4); log('Tarifario: ' + ft.length + ' municipios'); cadena = cadena.then(function () { return enviarEnTrozos('Tarifario', ft); }); }
+    var his = hoja(wb, 'Historial_Rutas');
+    if (his && $('xhis').checked) {
+      var fh = filasDe(his, [0, 1, 2, 3, 4, 5, 6], 4).map(function (r) { if (typeof r[0] === 'number') { var d = new Date(Math.round((r[0] - 25569) * 86400000)); r[0] = d.toISOString().slice(0, 10); } return r; });
+      log('Historial: ' + fh.length + ' filas'); cadena = cadena.then(function () { return enviarEnTrozos('Historial', fh); });
+    }
+    cadena.then(function () { log('✔ Importación terminada. Recargando datos...'); return cargar(); }).then(function () { log('✔ Listo.'); }).catch(function (e) { log('✖ Error: ' + e.message); });
+  };
+  fr.readAsArrayBuffer(f);
+}
+function renderConfig() {
+  var s = S.stats || {};
+  $('stats').innerHTML = 'Diccionario: <b>' + (s.diccionario || 0) + '</b> destinos · Directorio: <b>' + (s.directorio || 0) + '</b> tiendas · Tarifario: <b>' + (s.tarifario || 0) + '</b> municipios · Historial: <b>' + (s.historial || 0) + '</b> filas · Zonas: <b>' + deptos().length + '</b> departamentos';
+  if (S.hoja) $('hojaLink').href = S.hoja;
+}
+
+function renderTodo() {
+  var act = document.activeElement;
+  var enDeptos = act && act.closest && act.closest('#tdep');
+  renderRutas(); renderPedidos(); renderDicc(); renderConfig();
+  if (!enDeptos) renderDeptos();
+  $('dp').innerHTML = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
+}
+document.getElementById('nav').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#nav button').forEach(function (x) { x.classList.toggle('on', x === b); });
+  document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
+});
+$('dq').addEventListener('input', renderDicc);
+$('lk').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+arranque();
+</script>
+</body>
+</html>
