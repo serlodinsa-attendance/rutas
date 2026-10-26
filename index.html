@@ -72,6 +72,7 @@ td input[type=number]{width:62px}
 .rh .del{border:none;background:#334155;color:#fff;border-radius:6px;cursor:pointer;padding:2px 7px;margin-left:6px}
 .rh .del:hover{background:var(--bad)}
 textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1px solid var(--line);border-radius:0;font-family:inherit;font-size:13px;background:#fffbeb}
+.rdrag{cursor:grab;user-select:none}
 </style>
 </head>
 <body>
@@ -344,7 +345,7 @@ function renderRutas() {
   $('grid').innerHTML = S.rutas.map(function (r) {
     var t = totalesRuta(r), c = r.cap || [0, 0, 0, 0];
     var chip = function (n, v, cap) { return '<span class="' + (cap && v > cap ? 'exc' : '') + '">' + n + ' ' + v + (cap ? '/' + cap : '') + '</span>'; };
-    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span>RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos<button class="del" title="Mover esta ruta a otra posición (cambia su número)" onclick="moverRuta(' + r.n + ')">⇅</button><button class="del" title="Borrar esta ruta" onclick="borrarRuta(' + r.n + ')">🗑</button></small></div>' +
+    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span class="rdrag" draggable="true" data-rd="' + r.n + '" title="Arrastra para cambiar de posición">⠿ RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos<button class="del" title="Mover esta ruta a otra posición (cambia su número)" onclick="moverRuta(' + r.n + ')">⇅</button><button class="del" title="Borrar esta ruta" onclick="borrarRuta(' + r.n + ')">🗑</button></small></div>' +
       '<input placeholder="Piloto" list="pilotos" value="' + esc(r.piloto) + '" onchange="setRuta(' + r.n + ',\'piloto\',this.value)">' +
       '<div class="r2"><input placeholder="Placa" value="' + esc(r.placa) + '" onchange="setRuta(' + r.n + ',\'placa\',this.value)">' +
       '<input placeholder="Vehículo" value="' + esc(r.vehiculo) + '" onchange="setRuta(' + r.n + ',\'vehiculo\',this.value)"></div>' +
@@ -402,6 +403,11 @@ function moverRuta(n) {
   var m = parseInt(v, 10);
   if (!m || m < 1 || m > 99) { alert('Escribe un número del 1 al 99.'); return; }
   if (m === n) return;
+  intercambiarRutas(n, m);
+}
+var arrastrandoRuta = null;
+function intercambiarRutas(n, m) {
+  var r = rutaObj(n); if (!r || n === m) return;
   var otra = rutaObj(m);
   if (otra) otra.n = n;
   r.n = m;
@@ -460,6 +466,19 @@ function descargarExcel() {
 }
 var arrastrando = null;
 function enlazarDnD() {
+  document.querySelectorAll('.rdrag').forEach(function (h) {
+    h.addEventListener('dragstart', function (e) { arrastrandoRuta = Number(h.getAttribute('data-rd')); arrastrando = null; try { e.dataTransfer.setData('text/plain', 'ruta' + arrastrandoRuta); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} });
+    h.addEventListener('dragend', function () { arrastrandoRuta = null; document.querySelectorAll('.over').forEach(function (o) { o.classList.remove('over'); }); });
+  });
+  document.querySelectorAll('.ruta').forEach(function (z) {
+    z.addEventListener('drop', function (e) {
+      if (arrastrandoRuta === null) return;
+      e.preventDefault(); e.stopPropagation();
+      var m = Number(z.getAttribute('data-ruta')), n = arrastrandoRuta; arrastrandoRuta = null;
+      z.classList.remove('over');
+      if (n !== m) intercambiarRutas(n, m);
+    }, true);
+  });
   document.querySelectorAll('.it').forEach(function (el) {
     el.addEventListener('dragstart', function (e) { arrastrando = el.getAttribute('data-d'); el.classList.add('drag'); try { e.dataTransfer.setData('text/plain', arrastrando); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} });
     el.addEventListener('dragend', function () { el.classList.remove('drag'); document.querySelectorAll('.over').forEach(function (o) { o.classList.remove('over'); }); });
