@@ -498,10 +498,21 @@ function renderPedidos() {
   $('tped').innerHTML = '<tr><th>Destino</th><th>Departamento</th><th>MOTO</th><th>TORO</th><th>QUTE</th><th>KAYO</th><th>Comentario</th><th>Ruta</th><th></th></tr>' +
     S.pedidos.map(function (p, i) {
       var d = detectar(p.destino), r = rutaDe(p.destino);
-      return '<tr><td>' + esc(p.destino) + '</td><td>' + (d && d.depto ? esc(d.depto) : '<span class="q">❓ Nuevo</span>') + '</td>' +
+      var dsel = deptos().slice(); if (d && d.depto && dsel.indexOf(d.depto) < 0) dsel.push(d.depto);
+      var dcell = '<select onchange="setDeptoPedido(' + i + ',this.value)"><option value="">❓ Elegir...</option>' + dsel.map(function (x) { return '<option' + (d && x === d.depto ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>';
+      return '<tr><td>' + esc(p.destino) + '</td><td>' + dcell + '</td>' +
         ['m', 't', 'q', 'k'].map(function (c) { return '<td><input type="number" min="0" value="' + p[c] + '" onchange="editU(' + i + ',\'' + c + '\',this.value)"></td>'; }).join('') +
         '<td>' + esc(p.com || '') + '</td><td>' + (r ? 'Ruta ' + r.n : '—') + '</td><td><button class="b sec" onclick="quitarPedido(' + i + ')">✕</button></td></tr>';
     }).join('');
+}
+function setDeptoPedido(i, dep) {
+  var p = S.pedidos[i]; if (!p || !dep) return;
+  var k = S.dmap[norm(p.destino)], fila;
+  if (k !== undefined) { fila = S.dicc[k]; fila[2] = dep; fila[3] = zonaDe(dep); }
+  else { fila = [p.destino, '', dep, zonaDe(dep), '', '']; S.dicc.push(fila); indexarDicc(); }
+  setEstado('Guardando...', '#fde68a');
+  api('agregarDiccionario', [fila]).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  autoColocar(); renderTodo(); guardarTodo();
 }
 function editU(i, c, v) { S.pedidos[i][c] = num(v); renderTodo(); guardarTodo(); }
 function quitarPedido(i) { var p = S.pedidos[i]; if (!confirm('¿Quitar ' + p.destino + '?')) return; S.pedidos.splice(i, 1); limpiarObsoletos(); renderTodo(); guardarTodo(); }
