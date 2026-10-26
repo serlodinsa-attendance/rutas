@@ -69,6 +69,9 @@ td input[type=number]{width:62px}
 #login{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;align-items:center;justify-content:center}
 #login .box{background:#fff;padding:24px;border-radius:14px;max-width:360px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,.15)}
 .log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#0f172a;color:#a7f3d0;border-radius:8px;padding:8px 10px;max-height:200px;overflow:auto;white-space:pre-wrap}
+.rh .del{border:none;background:#334155;color:#fff;border-radius:6px;cursor:pointer;padding:2px 7px;margin-left:6px}
+.rh .del:hover{background:var(--bad)}
+textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1px solid var(--line);border-radius:0;font-family:inherit;font-size:13px;background:#fffbeb}
 </style>
 </head>
 <body>
@@ -92,6 +95,7 @@ td input[type=number]{width:62px}
     <button class="b ok" onclick="abrirManual()">+ Agregar destino / unidades</button>
     <button class="b sec" onclick="nuevaRuta()">+ Ruta</button>
     <button class="b sec" onclick="reAuto()">Acomodar pendientes por departamento</button>
+    <button class="b" onclick="descargarExcel()">⬇ Descargar Excel</button>
   </div>
   <div id="pool"></div>
   <div class="grid" id="grid"></div>
@@ -227,7 +231,10 @@ function cargar() {
   setEstado('Cargando...');
   return api('cargar').then(function (r) {
     S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
-    S.rutas = (r.rutas || []).sort(function (a, b) { return a.n - b.n; });
+    S.rutas = (r.rutas || []).map(function (x) {
+      if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
+      return x;
+    }).sort(function (a, b) { return a.n - b.n; });
     indexarDicc();
     limpiarObsoletos();
     var cambio = autoColocar();
@@ -244,7 +251,7 @@ function guardarTodo() {
 function enviar() {
   if (guardando) { pendiente = true; return; }
   guardando = true;
-  api('guardarTodo', S.pedidos, S.rutas).then(function () {
+  api('guardarTodo', S.pedidos, S.rutas.map(function (r) { return { n: r.n, piloto: r.piloto, placa: r.placa, vehiculo: r.vehiculo, cap: r.cap, destinos: { d: r.destinos, o: r.obs || '' } }; })).then(function () {
     guardando = false;
     if (pendiente) { pendiente = false; enviar(); } else setEstado('Guardado', '#86efac');
   }).catch(function (e) { guardando = false; setEstado('Error al guardar: ' + e.message, '#fca5a5'); });
@@ -265,7 +272,7 @@ function rutaPorDepto(depto) {
 function rutaObj(n, crear) {
   for (var i = 0; i < S.rutas.length; i++) if (S.rutas[i].n === n) return S.rutas[i];
   if (!crear) return null;
-  var r = { n: n, piloto: '', placa: '', vehiculo: '', destinos: [], cap: [0, 0, 0, 0] };
+  var r = { n: n, piloto: '', placa: '', vehiculo: '', destinos: [], obs: '', cap: [0, 0, 0, 0] };
   S.rutas.push(r); S.rutas.sort(function (a, b) { return a.n - b.n; });
   return r;
 }
@@ -291,10 +298,16 @@ function sugerir(destino) {
   }
   return n;
 }
-function autoColocar() {
+function enSinAuto(d) { return (S.cfg.sinAuto || []).indexOf(norm(d)) >= 0; }
+function quitarSinAuto(d) {
+  var a = S.cfg.sinAuto || [], k = a.indexOf(norm(d));
+  if (k >= 0) { a.splice(k, 1); S.cfg.sinAuto = a; api('guardarConfig', { sinAuto: a }).catch(function () {}); }
+}
+function autoColocar(force) {
   var cambio = false;
   S.pedidos.forEach(function (p) {
     if (rutaDe(p.destino)) return;
+    if (!force && enSinAuto(p.destino)) return;
     var n = sugerir(p.destino);
     if (!n) return;
     rutaObj(n, true).destinos.push(p.destino);
@@ -303,7 +316,10 @@ function autoColocar() {
   });
   return cambio;
 }
-function reAuto() { if (autoColocar()) { renderTodo(); guardarTodo(); } else alert('No hay pedidos pendientes con departamento conocido.'); }
+function reAuto() {
+  S.cfg.sinAuto = []; api('guardarConfig', { sinAuto: [] }).catch(function () {});
+  if (autoColocar(true)) { renderTodo(); guardarTodo(); } else alert('No hay pedidos pendientes con departamento conocido.');
+}
 function sinAsignar() { return S.pedidos.filter(function (p) { return !rutaDe(p.destino); }); }
 
 function totalesRuta(r) {
@@ -327,7 +343,7 @@ function renderRutas() {
   $('grid').innerHTML = S.rutas.map(function (r) {
     var t = totalesRuta(r), c = r.cap || [0, 0, 0, 0];
     var chip = function (n, v, cap) { return '<span class="' + (cap && v > cap ? 'exc' : '') + '">' + n + ' ' + v + (cap ? '/' + cap : '') + '</span>'; };
-    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span>RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos</small></div>' +
+    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span>RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos<button class="del" title="Borrar esta ruta" onclick="borrarRuta(' + r.n + ')">🗑</button></small></div>' +
       '<input placeholder="Piloto" list="pilotos" value="' + esc(r.piloto) + '" onchange="setRuta(' + r.n + ',\'piloto\',this.value)">' +
       '<div class="r2"><input placeholder="Placa" value="' + esc(r.placa) + '" onchange="setRuta(' + r.n + ',\'placa\',this.value)">' +
       '<input placeholder="Vehículo" value="' + esc(r.vehiculo) + '" onchange="setRuta(' + r.n + ',\'vehiculo\',this.value)"></div>' +
@@ -336,7 +352,8 @@ function renderRutas() {
       '<input type="number" min="0" title="Capacidad QUTE" placeholder="Cap Q" value="' + (c[2] || '') + '" onchange="setCap(' + r.n + ',2,this.value)">' +
       '<input type="number" min="0" title="Capacidad KAYO" placeholder="Cap K" value="' + (c[3] || '') + '" onchange="setCap(' + r.n + ',3,this.value)"></div></div>' +
       '<div class="tot">' + chip('M', t[0], c[0]) + chip('T', t[1], c[1]) + chip('Q', t[2], c[2]) + chip('K', t[3], c[3]) + '</div>' +
-      '<div class="items" data-ruta="' + r.n + '">' + (r.destinos.length ? r.destinos.map(function (d) { var p = pedidoDe(d); return p ? itemHTML(p, false) : ''; }).join('') : '<div class="vacio">Arrastra destinos aquí</div>') + '</div></div>';
+      '<div class="items" data-ruta="' + r.n + '">' + (r.destinos.length ? r.destinos.map(function (d) { var p = pedidoDe(d); return p ? itemHTML(p, false) : ''; }).join('') : '<div class="vacio">Arrastra destinos aquí</div>') + '</div>' +
+      '<textarea class="obsb" placeholder="Observaciones: complemento que necesitamos..." onchange="setObs(' + r.n + ',this.value)">' + esc(r.obs || '') + '</textarea></div>';
   }).join('');
   var pil = {}; S.rutas.forEach(function (r) { if (r.piloto) pil[r.piloto] = 1; });
   if (!$('pilotos')) { var dl = document.createElement('datalist'); dl.id = 'pilotos'; document.body.appendChild(dl); }
@@ -368,8 +385,50 @@ function moverA(d, n, antesDe) {
     if (antesDe) for (var i = 0; i < r.destinos.length; i++) if (norm(r.destinos[i]) === norm(antesDe)) idx = i;
     if (idx >= 0) r.destinos.splice(idx, 0, d); else r.destinos.push(d);
   }
-  delete S.nuevos[norm(d)];
+  delete S.nuevos[norm(d)]; if (n > 0) quitarSinAuto(d);
   renderTodo(); guardarTodo();
+}
+function libres(k) {
+  var u = {}, out = []; S.rutas.forEach(function (r) { u[r.n] = 1; });
+  for (var n = 1; n <= 60 && out.length < k; n++) if (!u[n]) out.push(n);
+  return out;
+}
+function setObs(n, v) { var r = rutaObj(n); if (r) { r.obs = v.trim(); guardarTodo(); } }
+function borrarRuta(n) {
+  var r = rutaObj(n); if (!r) return;
+  if (!confirm('¿Borrar la Ruta ' + n + '?' + (r.destinos.length ? '\nSus ' + r.destinos.length + ' destinos pasan a "Sin asignar".' : ''))) return;
+  var a = S.cfg.sinAuto || [];
+  r.destinos.forEach(function (d) { if (a.indexOf(norm(d)) < 0) a.push(norm(d)); });
+  S.cfg.sinAuto = a; api('guardarConfig', { sinAuto: a }).catch(function () {});
+  S.rutas = S.rutas.filter(function (x) { return x.n !== n; });
+  renderTodo(); guardarTodo();
+}
+function descargarExcel() {
+  if (typeof XLSX === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
+  var sa = sinAsignar(), incluir = false;
+  if (sa.length) incluir = confirm('Hay ' + sa.length + ' destinos sin asignar.\n\nAceptar = incluirlos al final del archivo (sin piloto)\nCancelar = dejarlos fuera');
+  var rows = [['Codigo', 'DESTINO', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'COMENTARIO', 'Region', 'Piloto', 'placa', 'HORARIO DE POSICIONAMIENTO', 'COMPLETACIÓN DE RUTA', 'ACEPTACIÓN DE RUTA-GRUPO UMA', 'OBSERVACIONES DE LA RUTA']];
+  var res = [['Ruta', 'Piloto', 'Placa', 'Vehículo', 'Destinos', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'Observaciones']];
+  function fila(p, r, primera) {
+    var d = detectar(p.destino) || {}, cod = d.codigo === undefined || d.codigo === '' ? null : d.codigo;
+    if (cod !== null && /^\d+$/.test(String(cod))) cod = Number(cod);
+    return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, p.com || null, d.zona || null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null, (r && primera && r.obs) ? r.obs : null];
+  }
+  S.rutas.forEach(function (r) {
+    if (!r.destinos.length) return;
+    var t = totalesRuta(r), prim = true;
+    r.destinos.forEach(function (dn) { var p = pedidoDe(dn); if (p) { rows.push(fila(p, r, prim)); prim = false; } });
+    res.push([r.n, r.piloto || '', r.placa || '', r.vehiculo || '', r.destinos.length, t[0], t[1], t[2], t[3], r.obs || '']);
+  });
+  if (incluir) sa.forEach(function (p) { rows.push(fila(p, null, false)); });
+  if (rows.length < 2) { alert('No hay destinos en las rutas para descargar.'); return; }
+  var wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows), ws2 = XLSX.utils.aoa_to_sheet(res);
+  ws['!cols'] = [{ wch: 14 }, { wch: 48 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 40 }];
+  ws2['!cols'] = [{ wch: 6 }, { wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 9 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 50 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Programacion');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resumen de rutas');
+  var f = new Date(), dd = ('0' + f.getDate()).slice(-2), mm = ('0' + (f.getMonth() + 1)).slice(-2);
+  XLSX.writeFile(wb, 'PROGRAMACION_' + dd + '_' + mm + '_' + f.getFullYear() + '.xlsx');
 }
 var arrastrando = null;
 function enlazarDnD() {
@@ -401,7 +460,7 @@ function abrirMover(d) {
   var o = '<option value="0">— Sin asignar —</option>';
   var usados = {}; S.rutas.forEach(function (r) { usados[r.n] = 1; });
   S.rutas.forEach(function (r) { o += '<option value="' + r.n + '">Ruta ' + r.n + (r.piloto ? ' — ' + esc(r.piloto) : '') + ' (' + r.destinos.length + ')</option>'; });
-  for (var n = 1; n <= 30; n++) if (!usados[n]) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; break; }
+  libres(6).forEach(function (n) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; });
   $('mvs').innerHTML = o;
   var r0 = rutaDe(d); $('mvs').value = r0 ? String(r0.n) : '0';
   $('mv').classList.add('on');
@@ -412,7 +471,7 @@ var editando = '';
 function opcionesRuta(sel) {
   var o = '<option value="0">Automática (por departamento)</option>';
   var usados = {}; S.rutas.forEach(function (r) { usados[r.n] = 1; o += '<option value="' + r.n + '">Ruta ' + r.n + (r.piloto ? ' — ' + esc(r.piloto) : '') + '</option>'; });
-  for (var n = 1; n <= 30; n++) if (!usados[n]) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; break; }
+  libres(6).forEach(function (n) { o += '<option value="' + n + '">Ruta ' + n + ' (nueva)</option>'; });
   $('m_r').innerHTML = o; if (sel !== undefined) $('m_r').value = String(sel);
 }
 function abrirManual() {
@@ -474,7 +533,8 @@ function cargarPegado() {
   var modo = document.querySelector('input[name=modo]:checked').value;
   if (modo === 'reemplazar') {
     if (S.pedidos.length && !confirm('Esto borra los ' + S.pedidos.length + ' pedidos anteriores y las rutas se arman de nuevo con los nuevos. ¿Continuar?')) return;
-    S.pedidos = nuevos; S.rutas.forEach(function (r) { r.destinos = []; }); S.nuevos = {};
+    S.pedidos = nuevos; S.rutas.forEach(function (r) { r.destinos = []; r.obs = ''; }); S.nuevos = {};
+    S.cfg.sinAuto = []; api('guardarConfig', { sinAuto: [] }).catch(function () {});
   } else {
     nuevos.forEach(function (n) { var p = pedidoDe(n.destino); if (p) { p.m += n.m; p.t += n.t; p.q += n.q; p.k += n.k; if (n.com) p.com = n.com; } else S.pedidos.push(n); });
   }
