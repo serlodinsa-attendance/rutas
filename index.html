@@ -96,6 +96,7 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
     <button class="b ok" onclick="abrirManual()">+ Agregar destino / unidades</button>
     <button class="b sec" onclick="nuevaRuta()">+ Ruta</button>
     <button class="b sec" onclick="reAuto()">Acomodar pendientes por departamento</button>
+    <button class="b sec" id="btnRec" onclick="recuperarBorrados()" style="display:none">↩ Recuperar borrados</button>
     <button class="b" onclick="descargarExcel()">⬇ Descargar Excel</button>
   </div>
   <div id="pool"></div>
@@ -339,9 +340,11 @@ function renderRutas() {
     '<div class="kpi"><b>' + arm + '</b><span>destinos armados</span></div><div class="kpi"><b>' + S.pedidos.length + '</b><span>pedidos de hoy</span></div>' +
     '<div class="kpi ' + (sa.length ? 'alert' : '') + '"><b>' + sa.length + '</b><span>sin asignar</span></div>';
   if (sa.length) {
-    $('pool').innerHTML = '<div class="pool" data-ruta="0"><h3>SIN ASIGNAR (' + sa.length + ') — arrástralos a una ruta o usa ⇄. Si dicen ❓, agrégalos al diccionario en la pestaña Pedidos.</h3><div class="items" data-ruta="0">' +
+    $('pool').innerHTML = '<div class="pool" data-ruta="0"><h3>SIN ASIGNAR (' + sa.length + ') — arrástralos a una ruta o usa ⇄. Si dicen ❓, agrégalos al diccionario en la pestaña Pedidos. <button class="b sec" style="padding:3px 10px;margin-left:8px" onclick="borrarTodosSinAsignar()">🗑 Borrar todos los sin asignar</button></h3><div class="items" data-ruta="0">' +
       sa.map(function (p) { return itemHTML(p, true); }).join('') + '</div></div>';
   } else $('pool').innerHTML = '';
+  var pb = leerPapelera(), br = $('btnRec');
+  if (br) { var tot = pb.reduce(function (a, b) { return a + b.length; }, 0); br.style.display = pb.length ? '' : 'none'; if (pb.length) br.textContent = '↩ Recuperar borrados (' + pb[pb.length - 1].length + ')'; }
   $('grid').innerHTML = S.rutas.map(function (r) {
     var t = totalesRuta(r), c = r.cap || [0, 0, 0, 0];
     var chip = function (n, v, cap) { return '<span class="' + (cap && v > cap ? 'exc' : '') + '">' + n + ' ' + v + (cap ? '/' + cap : '') + '</span>'; };
@@ -622,9 +625,29 @@ function setDeptoPedido(i, dep) {
   autoColocar(); renderTodo(); guardarTodo();
 }
 function editU(i, c, v) { S.pedidos[i][c] = num(v); renderTodo(); guardarTodo(); }
+function leerPapelera() { try { return JSON.parse(localStorage.getItem('rutas_papelera') || '[]'); } catch (e) { return []; } }
+function guardarPapelera(a) { try { localStorage.setItem('rutas_papelera', JSON.stringify(a.slice(-10))); } catch (e) {} }
+function enPapelera(lista) { var a = leerPapelera(); a.push(lista); guardarPapelera(a); }
+function recuperarBorrados() {
+  var a = leerPapelera(); if (!a.length) return;
+  var lote = a[a.length - 1];
+  if (!confirm('¿Recuperar los ' + lote.length + ' destinos borrados más recientes?\n' + lote.slice(0, 8).map(function (p) { return '• ' + p.destino; }).join('\n') + (lote.length > 8 ? '\n… y ' + (lote.length - 8) + ' más' : ''))) return;
+  lote.forEach(function (p) { if (!pedidoDe(p.destino)) S.pedidos.push(p); });
+  a.pop(); guardarPapelera(a);
+  renderTodo(); guardarTodo();
+}
+function borrarTodosSinAsignar() {
+  var sa = sinAsignar(); if (!sa.length) return;
+  if (!confirm('¿Borrar los ' + sa.length + ' destinos SIN ASIGNAR de los pedidos de hoy?\n(Podrás recuperarlos con "Recuperar borrados".)')) return;
+  enPapelera(sa.map(function (p) { return JSON.parse(JSON.stringify(p)); }));
+  var ks = {}; sa.forEach(function (p) { ks[norm(p.destino)] = 1; });
+  S.pedidos = S.pedidos.filter(function (p) { return !ks[norm(p.destino)]; });
+  Object.keys(ks).forEach(function (k) { delete S.nuevos[k]; });
+  limpiarObsoletos(); renderTodo(); guardarTodo();
+}
 function borrarPedidoNombre(d) {
   if (!confirm('¿Borrar "' + d + '" de los pedidos de hoy?')) return;
-  var k = norm(d);
+  var k = norm(d), pp = pedidoDe(d); if (pp) enPapelera([JSON.parse(JSON.stringify(pp))]);
   S.pedidos = S.pedidos.filter(function (p) { return norm(p.destino) !== k; });
   delete S.nuevos[k];
   limpiarObsoletos(); renderTodo(); guardarTodo();
