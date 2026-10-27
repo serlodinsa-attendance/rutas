@@ -93,6 +93,7 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
     <button data-v="dicc">Diccionario</button>
     <button data-v="costos">Costos de Rutas</button>
     <button data-v="tarifario">Tarifario</button>
+    <button data-v="rent">Rentabilidad</button>
     <button data-v="config">Configuración</button>
   </nav>
   <div id="estado">Cargando...</div>
@@ -148,6 +149,10 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
 
 <section id="v-costos" class="view">
   <div id="costos"></div>
+</section>
+
+<section id="v-rent" class="view">
+  <div id="rent"></div>
 </section>
 
 <section id="v-tarifario" class="view">
@@ -721,6 +726,73 @@ function agregarTar() {
   guardarTarifas(); renderTarifario(); renderCostos();
 }
 
+/* ---------- rentabilidad diaria ---------- */
+function rentData() { if (!Array.isArray(S.cfg.rentabilidad)) S.cfg.rentabilidad = []; return S.cfg.rentabilidad; }
+function guardarRent() {
+  clearTimeout(guardarRent.t); setEstado('Guardando...', '#fde68a');
+  guardarRent.t = setTimeout(function () {
+    api('guardarConfig', { rentabilidad: rentData() }).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  }, 600);
+}
+function hoyISO() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function fISO(f) { var p = String(f).split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
+function d2(n) { return ('0' + n).slice(-2); }
+function lunesDe(f) { var d = fISO(f); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+function semISO(d) { var t = new Date(d.getTime()); t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7)); var w1 = new Date(t.getFullYear(), 0, 4); return 1 + Math.round(((t - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7); }
+var MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+function totalesDelDia() {
+  var ing = 0, ut = 0;
+  S.rutas.forEach(function (r) { if (!r.destinos.length) return; var c = costoRuta(r); ing += c.ing; ut += c.util; });
+  return [Math.round(ing * 100) / 100, Math.round(ut * 100) / 100];
+}
+function traerDeCostos() { var t = totalesDelDia(); $('rfi').value = t[0]; $('rfu').value = t[1]; }
+function guardarDia() {
+  var f = $('rff').value, i = parseFloat($('rfi').value), u = parseFloat($('rfu').value);
+  if (!f || isNaN(i) || isNaN(u)) { alert('Pon la fecha, el ingreso y la utilidad.'); return; }
+  var d = rentData(), k = d.findIndex(function (x) { return x[0] === f; });
+  if (k >= 0) { if (!confirm('Ya hay un registro del ' + f + '. ¿Reemplazarlo?')) return; d[k] = [f, i, u]; } else d.push([f, i, u]);
+  d.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+  $('rfi').value = ''; $('rfu').value = '';
+  guardarRent(); renderRent();
+}
+function editRent(f, c, v) { var d = rentData(), k = d.findIndex(function (x) { return x[0] === f; }); if (k < 0) return; d[k][c] = parseFloat(v) || 0; guardarRent(); renderRent(); }
+function borrarRent(f) { if (!confirm('¿Borrar el registro del ' + f + '?')) return; S.cfg.rentabilidad = rentData().filter(function (x) { return x[0] !== f; }); guardarRent(); renderRent(); }
+function renderRent() {
+  if (!$('rent')) return;
+  var d = rentData().slice().sort(function (a, b) { return a[0] < b[0] ? 1 : -1; });
+  var hoy = hoyISO(), mesAct = hoy.slice(0, 7), mI = 0, mU = 0, mD = 0, sem = {}, mes = {};
+  d.forEach(function (x) {
+    var l = lunesDe(x[0]), ks = l.getTime(); sem[ks] = sem[ks] || { l: l, n: 0, i: 0, u: 0 }; sem[ks].n++; sem[ks].i += x[1]; sem[ks].u += x[2];
+    var km = x[0].slice(0, 7); mes[km] = mes[km] || { n: 0, i: 0, u: 0 }; mes[km].n++; mes[km].i += x[1]; mes[km].u += x[2];
+    if (km === mesAct) { mI += x[1]; mU += x[2]; mD++; }
+  });
+  var tab = function (cab, filas) { return '<div class="tw"><table><tr>' + cab.map(function (c, i) { return '<th' + (i ? ' style="text-align:right"' : '') + '>' + c + '</th>'; }).join('') + '</tr>' + filas + '</table></div>'; };
+  var rs = function (a) { return '<td style="text-align:right">' + a + '</td>'; };
+  var semK = Object.keys(sem).sort(function (a, b) { return b - a; }).slice(0, 20);
+  var mesK = Object.keys(mes).sort().reverse();
+  var h = '<div class="card"><h2>Registrar día</h2><div class="row">' +
+    '<label class="mut">Fecha<br><input type="date" id="rff" value="' + ($('rff') && $('rff').value ? $('rff').value : hoy) + '"></label>' +
+    '<label class="mut">Ingreso total (Q)<br><input type="number" step="any" id="rfi" placeholder="0.00" style="width:150px"></label>' +
+    '<label class="mut">Utilidad total (Q)<br><input type="number" step="any" id="rfu" placeholder="0.00" style="width:150px"></label>' +
+    '<button class="b sec" onclick="traerDeCostos()" style="align-self:flex-end">⬇ Traer de Costos de Rutas</button>' +
+    '<button class="b ok" onclick="guardarDia()" style="align-self:flex-end">Guardar día</button></div>' +
+    '<p class="mut" style="margin:6px 0 0">“Traer de Costos de Rutas” copia el ingreso y la utilidad total de las rutas de hoy. Si ya existe la fecha, te pregunta si la reemplazas.</p></div>';
+  h += '<div class="card"><h2>' + MESES[Number(mesAct.slice(5)) - 1] + ' ' + mesAct.slice(0, 4) + ' (este mes)</h2><div class="cres"><div><span>Ingreso bruto</span><b>' + q2(mI) + '</b></div><div class="' + (mU < 0 ? 'neg' : 'pos') + '"><span>Utilidad</span><b>' + q2(mU) + '</b></div><div><span>Días registrados</span><b>' + mD + '</b></div></div></div>';
+  h += '<div class="card"><h2>Totales por semana</h2>' + tab(['Semana', 'Días', 'Ingreso bruto', 'Utilidad'], semK.map(function (k) {
+    var s = sem[k], f = new Date(s.l.getTime()); f.setDate(f.getDate() + 6);
+    return '<tr><td>Sem ' + semISO(s.l) + ' (' + d2(s.l.getDate()) + '/' + d2(s.l.getMonth() + 1) + ' - ' + d2(f.getDate()) + '/' + d2(f.getMonth() + 1) + ')</td>' + rs(s.n) + rs(q2(s.i)) + rs(q2(s.u)) + '</tr>';
+  }).join('')) + '</div>';
+  h += '<div class="card"><h2>Totales por mes</h2>' + tab(['Mes', 'Días', 'Ingreso bruto', 'Utilidad'], mesK.map(function (k) {
+    var m = mes[k]; return '<tr><td>' + MESES[Number(k.slice(5)) - 1] + ' ' + k.slice(0, 4) + '</td>' + rs(m.n) + rs(q2(m.i)) + rs(q2(m.u)) + '</tr>';
+  }).join('')) + '</div>';
+  h += '<div class="card"><h2>Días registrados <small class="mut">(puedes corregir los montos)</small></h2><div class="tw"><table><tr><th>Fecha</th><th>Ingreso bruto (Q)</th><th>Utilidad (Q)</th><th></th></tr>' + d.slice(0, 120).map(function (x) {
+    return '<tr><td>' + x[0].split('-').reverse().join('/') + '</td><td><input type="number" step="any" style="width:140px" value="' + x[1] + '" onchange="editRent(\'' + x[0] + '\',1,this.value)"></td><td><input type="number" step="any" style="width:140px" value="' + x[2] + '" onchange="editRent(\'' + x[0] + '\',2,this.value)"></td><td><button class="b sec" onclick="borrarRent(\'' + x[0] + '\')">🗑</button></td></tr>';
+  }).join('') + '</table></div></div>';
+  var act = document.activeElement, keep = act && act.id && $('rent').contains(act) ? act.id : null, kv = keep ? act.value : null;
+  $('rent').innerHTML = h;
+  if (keep && $(keep)) { $(keep).value = kv; $(keep).focus(); }
+}
+
 var arrastrando = null;
 function enlazarDnD() {
   document.querySelectorAll('.rdrag').forEach(function (h) {
@@ -1046,7 +1118,7 @@ function renderConfig() {
 function renderTodo() {
   var act = document.activeElement;
   var enDeptos = act && act.closest && act.closest('#tdep');
-  renderRutas(); renderPedidos(); renderDicc(); renderConfig(); renderCostos(); renderTarifario();
+  renderRutas(); renderPedidos(); renderDicc(); renderConfig(); renderCostos(); renderTarifario(); renderRent();
   if (!enDeptos) renderDeptos();
   $('dp').innerHTML = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
 }
@@ -1056,7 +1128,7 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
-document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); });
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); });
 $('lk').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
 arranque();
 </script>
