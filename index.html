@@ -102,6 +102,7 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
     <button class="b sec" onclick="reAuto()">Acomodar pendientes por departamento</button>
     <button class="b sec" id="btnRec" onclick="recuperarBorrados()" style="display:none">↩ Recuperar borrados</button>
     <button class="b" onclick="descargarExcel()">⬇ Descargar Excel</button>
+    <button class="b" style="background:#0f766e" onclick="descargarAsignacion()">⬇ Asignación final pilotos</button>
   </div>
   <div id="pool"></div>
   <div class="grid" id="grid"></div>
@@ -429,6 +430,67 @@ function borrarRuta(n) {
   S.cfg.sinAuto = a; api('guardarConfig', { sinAuto: a }).catch(function () {});
   S.rutas = S.rutas.filter(function (x) { return x.n !== n; });
   renderTodo(); guardarTodo();
+}
+function descargarAsignacion() {
+  if (typeof ExcelJS === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
+  var rutas = S.rutas.filter(function (r) { return r.destinos.some(function (d) { return pedidoDe(d); }); });
+  if (!rutas.length) { alert('No hay rutas con destinos para descargar.'); return; }
+  var wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Asignación pilotos', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true } });
+  [44, 18, 9, 9, 9, 9, 34].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  var AZUL = 'FF1F4E79', CLARO = 'FFDCE6F1', GRIS = 'FFF2F2F2', fila = 1;
+  var thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, bd = { top: thin, left: thin, bottom: thin, right: thin };
+  function estilo(c, o) {
+    o = o || {};
+    c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: { argb: o.color || 'FF000000' } };
+    c.alignment = { horizontal: o.h || 'left', vertical: 'middle', wrapText: true };
+    if (o.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: o.fill } };
+    if (o.border !== false) c.border = bd;
+  }
+  rutas.forEach(function (r, idx) {
+    var ini = fila;
+    ws.mergeCells(fila, 1, fila, 7);
+    var t = ws.getCell(fila, 1); t.value = 'RUTA ' + r.n; estilo(t, { bold: true, size: 15, color: 'FFFFFFFF', fill: AZUL, h: 'left' });
+    ws.getRow(fila).height = 26; fila++;
+    ws.mergeCells(fila, 1, fila, 2); ws.mergeCells(fila, 3, fila, 4); ws.mergeCells(fila, 5, fila, 7);
+    var a = ws.getCell(fila, 1); a.value = 'Piloto: ' + (r.piloto || '(sin asignar)'); estilo(a, { bold: true, size: 13, fill: CLARO });
+    var b = ws.getCell(fila, 3); b.value = 'Placa: ' + (r.placa || '—'); estilo(b, { bold: true, size: 12, fill: CLARO });
+    var c = ws.getCell(fila, 5); c.value = 'Vehículo: ' + (r.vehiculo || '—'); estilo(c, { bold: true, size: 12, fill: CLARO });
+    ['B', 'D', 'F', 'G'].forEach(function (col) { estilo(ws.getCell(col + fila), { fill: CLARO }); });
+    ws.getRow(fila).height = 24; fila++;
+    ['Destino', 'Departamento', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'Comentario'].forEach(function (h, i) { var x = ws.getCell(fila, i + 1); x.value = h; estilo(x, { bold: true, color: 'FFFFFFFF', fill: AZUL, h: 'center' }); });
+    fila++;
+    var primero = fila, prim = true;
+    r.destinos.forEach(function (dn, k) {
+      var p = pedidoDe(dn); if (!p) return;
+      var d = detectar(p.destino) || {}, fill = (k % 2) ? GRIS : null;
+      var com = [p.com, prim ? r.obs : ''].filter(Boolean).join(' | '); prim = false;
+      [p.destino, d.depto || '', p.m || 0, p.t || 0, p.q || 0, p.k || 0, com].forEach(function (v, i) {
+        var x = ws.getCell(fila, i + 1); x.value = v;
+        estilo(x, { h: i >= 2 && i <= 5 ? 'center' : 'left', fill: fill });
+      });
+      fila++;
+    });
+    var ult = fila - 1;
+    var tot = ws.getCell(fila, 1); tot.value = 'TOTAL ='; estilo(tot, { bold: true, fill: CLARO });
+    estilo(ws.getCell(fila, 2), { fill: CLARO });
+    ['C', 'D', 'E', 'F'].forEach(function (col, i) {
+      var x = ws.getCell(col + fila), sum = 0;
+      var tt = totalesRuta(r); sum = tt[i];
+      x.value = { formula: 'SUM(' + col + primero + ':' + col + ult + ')', result: sum };
+      estilo(x, { bold: true, h: 'center', fill: CLARO });
+    });
+    estilo(ws.getCell(fila, 7), { fill: CLARO });
+    if (idx < rutas.length - 1) ws.getRow(fila).addPageBreak();
+    fila += 3;
+  });
+  var f = new Date(), dd = ('0' + f.getDate()).slice(-2), mm = ('0' + (f.getMonth() + 1)).slice(-2);
+  wb.xlsx.writeBuffer().then(function (buf) {
+    window.__xlsxBuf = buf;
+    var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'Asignacion_final_pilotos_' + dd + '_' + mm + '_' + f.getFullYear() + '.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
 }
 function descargarExcel() {
   if (typeof ExcelJS === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
