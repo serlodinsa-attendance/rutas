@@ -77,6 +77,9 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
 .it .n{flex:1 1 100%;white-space:normal;overflow:visible;font-size:12.5px;line-height:1.25;word-break:break-word}
 .it .d{flex:1 1 auto}
 .pool .it{flex:1 1 300px}
+.ct td{padding:4px 8px}.ct tr.sint td{background:#fef2f2}
+.cres{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}.cres div{background:#f1f5f9;border-radius:10px;padding:8px 14px;display:flex;flex-direction:column;min-width:130px}
+.cres span{font-size:11px;color:var(--mut)}.cres b{font-size:16px}.cres .pos{background:#dcfce7}.cres .neg{background:#fee2e2}
 </style>
 </head>
 <body>
@@ -88,6 +91,8 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
     <button data-v="rutas" class="on">Rutas Hoy</button>
     <button data-v="pedidos">Pedidos</button>
     <button data-v="dicc">Diccionario</button>
+    <button data-v="costos">Costos de Rutas</button>
+    <button data-v="tarifario">Tarifario</button>
     <button data-v="config">Configuración</button>
   </nav>
   <div id="estado">Cargando...</div>
@@ -139,6 +144,26 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
   </div>
   <div class="row" style="margin-bottom:8px"><input id="dq" placeholder="Buscar en el diccionario..." style="flex:1;max-width:420px"><span class="mut" id="dcount"></span></div>
   <div class="tw"><table id="tdicc"></table></div>
+</section>
+
+<section id="v-costos" class="view">
+  <div id="costos"></div>
+</section>
+
+<section id="v-tarifario" class="view">
+  <div class="card">
+    <h2>Agregar municipio al tarifario</h2>
+    <div class="row">
+      <input id="tnd" placeholder="Departamento" style="flex:1;min-width:140px">
+      <input id="tnm" placeholder="Municipio" style="flex:1;min-width:140px">
+      <input id="tn2" type="number" step="any" placeholder="Tarifa 2W" style="width:110px">
+      <input id="tn3" type="number" step="any" placeholder="Tarifa 3W" style="width:110px">
+      <input id="tn4" type="number" step="any" placeholder="Tarifa 4W" style="width:110px">
+      <button class="b ok" onclick="agregarTar()">Agregar</button>
+    </div>
+  </div>
+  <div class="row" style="margin-bottom:8px"><input id="tq" placeholder="Buscar departamento o municipio..." oninput="renderTarifario()" style="flex:1;max-width:420px"><span class="mut" id="tcount"></span></div>
+  <div class="tw"><table id="ttar"></table></div>
 </section>
 
 <section id="v-config" class="view">
@@ -240,7 +265,7 @@ function cargar() {
   return api('cargar').then(function (r) {
     S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
     S.rutas = (r.rutas || []).map(function (x) {
-      if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
+      if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.c = (x.destinos && x.destinos.c) || {}; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
       return x;
     }).sort(function (a, b) { return a.n - b.n; });
     indexarDicc();
@@ -259,7 +284,7 @@ function guardarTodo() {
 function enviar() {
   if (guardando) { pendiente = true; return; }
   guardando = true;
-  api('guardarTodo', S.pedidos, S.rutas.map(function (r) { return { n: r.n, piloto: r.piloto, placa: r.placa, vehiculo: r.vehiculo, cap: r.cap, destinos: { d: r.destinos, o: r.obs || '' } }; })).then(function () {
+  api('guardarTodo', S.pedidos, S.rutas.map(function (r) { return { n: r.n, piloto: r.piloto, placa: r.placa, vehiculo: r.vehiculo, cap: r.cap, destinos: { d: r.destinos, o: r.obs || '', c: r.c || {} } }; })).then(function () {
     guardando = false;
     if (pendiente) { pendiente = false; enviar(); } else setEstado('Guardado', '#86efac');
   }).catch(function (e) { guardando = false; setEstado('Error al guardar: ' + e.message, '#fca5a5'); });
@@ -533,6 +558,169 @@ function descargarExcel() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   });
 }
+/* ---------- tarifario y costos ---------- */
+var COSTO_DEF = { viaticos: 50, galones: 0, precio: 42, piloto: 133, aux1: 116, aux2: 0 };
+function tarifas() { return Array.isArray(S.cfg.tarifario) ? S.cfg.tarifario : []; }
+function guardarTarifas() {
+  clearTimeout(guardarTarifas.t); setEstado('Guardando...', '#fde68a');
+  guardarTarifas.t = setTimeout(function () {
+    api('guardarConfig', { tarifario: tarifas() }).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  }, 700);
+}
+function tarifaDeMuni(m) {
+  var k = norm(m); if (!k) return null;
+  var t = tarifas();
+  for (var i = 0; i < t.length; i++) if (norm(t[i][1]) === k) return [Number(t[i][2]) || 0, Number(t[i][3]) || 0, Number(t[i][4]) || 0];
+  return null;
+}
+function muniDe(dest) {
+  var d = detectar(dest);
+  if (d && d.muni) return d.muni;
+  var k = norm(dest), best = '', t = tarifas();
+  for (var i = 0; i < t.length; i++) { var m = norm(t[i][1]); if (m && k.indexOf(m) >= 0 && m.length > norm(best).length) best = t[i][1]; }
+  return best;
+}
+function defCostos() { var d = S.cfg.costosDef || {}, o = {}; for (var k in COSTO_DEF) o[k] = d[k] !== undefined && d[k] !== '' ? Number(d[k]) : COSTO_DEF[k]; return o; }
+function costoRuta(r) {
+  var def = defCostos(), c = r.c || {}, v = {};
+  for (var k in def) v[k] = c[k] !== undefined && c[k] !== '' && c[k] !== null ? Number(c[k]) : def[k];
+  var filas = [], ing = 0;
+  r.destinos.forEach(function (dn) {
+    var p = pedidoDe(dn); if (!p) return;
+    var m = muniDe(dn), t = tarifaDeMuni(m), tot = 0;
+    if (t) tot = (p.m || 0) * t[0] + (p.t || 0) * t[1] + ((p.q || 0) + (p.k || 0)) * t[2];
+    ing += tot; filas.push({ d: dn, m: m, t: t, p: p, tot: tot });
+  });
+  var comb = v.galones * v.precio, iva = ing - ing / 1.12, costos = comb + iva + v.piloto + v.aux1 + v.aux2 + v.viaticos;
+  return { v: v, filas: filas, ing: ing, comb: comb, iva: iva, costos: costos, util: ing - costos };
+}
+function setCosto(n, k, val) { var r = rutaObj(n); if (!r) return; r.c = r.c || {}; if (String(val).trim() === '') delete r.c[k]; else r.c[k] = Number(val) || 0; renderCostos(); guardarTodo(); }
+function setDefCosto(k, val) { var d = S.cfg.costosDef || {}; d[k] = Number(val) || 0; S.cfg.costosDef = d; api('guardarConfig', { costosDef: d }).catch(function () {}); renderCostos(); }
+function setMuni(dest, val) {
+  val = val.trim(); var i = S.dmap[norm(dest)], r;
+  if (i === undefined) { r = [dest, '', '', '', '', val]; S.dicc.push(r); indexarDicc(); } else { r = S.dicc[i]; r[5] = val; }
+  setEstado('Guardando...', '#fde68a');
+  api('agregarDiccionario', [r]).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  renderCostos();
+}
+function q2(n) { return 'Q ' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function renderCostos() {
+  if (!$('costos')) return;
+  var rutas = S.rutas.filter(function (r) { return r.destinos.length; }), tI = 0, tC = 0, def = defCostos();
+  var cal = rutas.map(function (r) { var c = costoRuta(r); tI += c.ing; tC += c.costos; return c; });
+  var munis = tarifas().map(function (t) { return '<option value="' + esc(t[1]) + '">'; }).join('');
+  var h = '<datalist id="dlmun">' + munis + '</datalist>';
+  h += '<div class="bar"><div class="kpi"><b>' + q2(tI) + '</b><span>Ingreso total (sin descontar)</span></div><div class="kpi"><b>' + q2(tC) + '</b><span>Costos totales</span></div>' +
+    '<div class="kpi ' + (tI - tC < 0 ? 'alert' : '') + '"><b>' + q2(tI - tC) + '</b><span>Utilidad total</span></div>' +
+    '<button class="b" style="margin-left:auto" onclick="descargarCostos()">⬇ Descargar Excel de costos</button></div>';
+  h += '<div class="card"><h2>Valores por defecto de cada ruta <small class="mut">(se aplican a todas las rutas; puedes cambiarlos en cada ruta)</small></h2><div class="row">' +
+    [['viaticos', 'Viáticos Q'], ['galones', 'Galones'], ['precio', 'Precio galón Q'], ['piloto', 'Salario piloto Q'], ['aux1', 'Salario auxiliar 1 Q'], ['aux2', 'Salario auxiliar 2 Q']].map(function (x) {
+      return '<label class="mut">' + x[1] + '<br><input type="number" step="any" style="width:110px" value="' + def[x[0]] + '" onchange="setDefCosto(\'' + x[0] + '\',this.value)"></label>';
+    }).join('') + '</div></div>';
+  if (!rutas.length) h += '<div class="card mut">No hay rutas con destinos. Arma las rutas en "Rutas Hoy" y aquí aparecen sus costos.</div>';
+  rutas.forEach(function (r, i) {
+    var c = cal[i], sinM = c.filas.filter(function (f) { return !f.t; }).length;
+    h += '<div class="card"><h2>RUTA ' + r.n + ' — ' + esc(r.piloto || '(sin piloto)') + ' <small class="mut">Placa: ' + esc(r.placa || '-') + '</small>' + (sinM ? ' <small style="color:var(--bad)">· ' + sinM + ' sin tarifa</small>' : '') + '</h2><div class="tw"><table class="ct">' +
+      '<tr><th>Destino</th><th>Municipio (tarifario)</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Tarifa 2W</th><th>Tarifa 3W</th><th>Tarifa 4W</th><th>Total Q</th></tr>' +
+      c.filas.map(function (f) {
+        return '<tr' + (f.t ? '' : ' class="sint"') + '><td>' + esc(f.d) + '</td><td><input list="dlmun" style="width:170px" value="' + esc(f.m) + '" placeholder="❓ elegir" onchange="setMuni(this.closest(\'tr\').getAttribute(\'data-d\'),this.value)"></td>' +
+          '<td>' + (f.p.m || 0) + '</td><td>' + (f.p.t || 0) + '</td><td>' + (f.p.q || 0) + '</td><td>' + (f.p.k || 0) + '</td>' +
+          '<td>' + (f.t ? f.t[0].toFixed(2) : '-') + '</td><td>' + (f.t ? f.t[1].toFixed(2) : '-') + '</td><td>' + (f.t ? f.t[2].toFixed(2) : '-') + '</td><td><b>' + f.tot.toFixed(2) + '</b></td></tr>';
+      }).join('')+
+      '</table></div>';
+    h += '<div class="row" style="margin-top:10px;align-items:flex-end">' +
+      [['viaticos', 'Viáticos Q'], ['galones', 'Galones consumidos'], ['precio', 'Precio galón Q'], ['piloto', 'Salario piloto Q'], ['aux1', 'Salario auxiliar 1 Q'], ['aux2', 'Salario auxiliar 2 Q']].map(function (x) {
+        return '<label class="mut">' + x[1] + '<br><input type="number" step="any" style="width:110px" value="' + c.v[x[0]] + '" onchange="setCosto(' + r.n + ',\'' + x[0] + '\',this.value)"></label>';
+      }).join('') + '</div>' +
+      '<div class="cres"><div><span>Ingreso (tarifas)</span><b>' + q2(c.ing) + '</b></div><div><span>Combustible</span><b>' + q2(c.comb) + '</b></div><div><span>IVA</span><b>' + q2(c.iva) + '</b></div>' +
+      '<div><span>Total costos</span><b>' + q2(c.costos) + '</b></div><div class="' + (c.util < 0 ? 'neg' : 'pos') + '"><span>Utilidad / rentabilidad</span><b>' + q2(c.util) + '</b></div></div></div>';
+  });
+  $('costos').innerHTML = h;
+  // data-d en filas (seguro ante comillas)
+  var trs = $('costos').querySelectorAll('table.ct');
+  trs.forEach(function (t, ti) { var f = cal[ti].filas; t.querySelectorAll('tr').forEach(function (tr, k) { if (k > 0) tr.setAttribute('data-d', f[k - 1].d); }); });
+}
+function descargarCostos() {
+  if (typeof ExcelJS === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
+  var rutas = S.rutas.filter(function (r) { return r.destinos.length; });
+  if (!rutas.length) { alert('No hay rutas con destinos.'); return; }
+  var wb = new ExcelJS.Workbook(), res = wb.addWorksheet('Resumen'), ws = wb.addWorksheet('Costos por ruta');
+  var AZUL = 'FF1F4E79', CLARO = 'FFDCE6F1', AMAR = 'FFFFF2CC', thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, bd = { top: thin, left: thin, bottom: thin, right: thin }, QF = '"Q"#,##0.00';
+  function st(c, o) { o = o || {}; c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: { argb: o.color || 'FF000000' } }; c.alignment = { horizontal: o.h || 'left', vertical: 'middle', wrapText: !!o.wrap }; if (o.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: o.fill } }; c.border = bd; if (o.nf) c.numFmt = o.nf; }
+  [34, 22, 8, 8, 8, 8, 13, 13, 13, 15].forEach(function (w, i) { ws.getColumn(i + 1).width = w; });
+  var fila = 1, refs = [];
+  rutas.forEach(function (r) {
+    var c = costoRuta(r);
+    ws.mergeCells(fila, 1, fila, 10);
+    var t = ws.getCell(fila, 1); t.value = 'RUTA ' + r.n + ' - ' + (r.piloto || '(sin piloto)') + '  |  Placa: ' + (r.placa || '-'); st(t, { bold: true, size: 13, color: 'FFFFFFFF', fill: AZUL }); ws.getRow(fila).height = 24; fila++;
+    ['Destino', 'Municipio', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'Tarifa 2W', 'Tarifa 3W', 'Tarifa 4W', 'Total (Q)'].forEach(function (hh, i) { var x = ws.getCell(fila, i + 1); x.value = hh; st(x, { bold: true, color: 'FFFFFFFF', fill: AZUL, h: 'center' }); }); fila++;
+    var p0 = fila;
+    c.filas.forEach(function (f) {
+      var vals = [f.d, f.m || '❓ Sin municipio', f.p.m || 0, f.p.t || 0, f.p.q || 0, f.p.k || 0, f.t ? f.t[0] : 0, f.t ? f.t[1] : 0, f.t ? f.t[2] : 0];
+      vals.forEach(function (v, i) { var x = ws.getCell(fila, i + 1); x.value = v; st(x, { h: i >= 2 ? 'center' : 'left', nf: i >= 6 ? QF : undefined }); });
+      var tt = ws.getCell(fila, 10); tt.value = { formula: 'C' + fila + '*G' + fila + '+D' + fila + '*H' + fila + '+(E' + fila + '+F' + fila + ')*I' + fila, result: f.tot }; st(tt, { bold: true, h: 'center', nf: QF });
+      fila++;
+    });
+    var p1 = fila - 1, rI = fila;
+    function linea(lbl, val, o) { ws.mergeCells(fila, 1, fila, 2); var a = ws.getCell(fila, 1); a.value = lbl; st(a, { bold: true, fill: o.fill || CLARO }); st(ws.getCell(fila, 2), { fill: o.fill || CLARO }); var b = ws.getCell(fila, 3); ws.mergeCells(fila, 3, fila, 4); b.value = val; st(b, { bold: !!o.bold, h: 'right', nf: QF, fill: o.input ? AMAR : undefined }); st(ws.getCell(fila, 4), { fill: o.input ? AMAR : undefined }); fila++; return 'C' + (fila - 1); }
+    var cI = linea('TOTAL TARIFAS (INGRESO):', { formula: 'SUM(J' + p0 + ':J' + p1 + ')', result: c.ing }, { bold: true });
+    var cV = linea('Viáticos (Q):', c.v.viaticos, { input: true });
+    var cG = linea('Galones consumidos:', c.v.galones, { input: true }); ws.getCell(cG).numFmt = '0.00';
+    var cP = linea('Precio por galón (Q):', c.v.precio, { input: true });
+    var cC = linea('Combustible (Q):', { formula: cG + '*' + cP, result: c.comb }, {});
+    var cIVA = linea('IVA (Q):', { formula: cI + '-(' + cI + '/1.12)', result: c.iva }, {});
+    var cS = linea('Salario piloto (Q):', c.v.piloto, { input: true });
+    var cA1 = linea('Salario auxiliar 1 (Q):', c.v.aux1, { input: true });
+    var cA2 = linea('Salario auxiliar 2 (Q):', c.v.aux2, { input: true });
+    var cT = linea('TOTAL COSTOS (Q):', { formula: cC + '+' + cIVA + '+' + cS + '+' + cA1 + '+' + cA2 + '+' + cV, result: c.costos }, { bold: true });
+    var cU = linea('UTILIDAD / RENTABILIDAD (Q):', { formula: cI + '-' + cT, result: c.util }, { bold: true, fill: 'FFE2EFDA' });
+    refs.push({ r: r, c: c, I: cI, T: cT, U: cU });
+    fila += 2;
+  });
+  [8, 24, 14, 16, 16, 16].forEach(function (w, i) { res.getColumn(i + 1).width = w; });
+  res.mergeCells('A1:F1'); var rt = res.getCell('A1'); rt.value = 'Resumen general de costos y rentabilidad'; st(rt, { bold: true, size: 14, color: 'FFFFFFFF', fill: AZUL }); res.getRow(1).height = 26;
+  ['Ruta', 'Piloto', 'Placa', 'Ingreso (Q)', 'Costos (Q)', 'Utilidad (Q)'].forEach(function (hh, i) { var x = res.getCell(2, i + 1); x.value = hh; st(x, { bold: true, fill: CLARO, h: 'center' }); });
+  refs.forEach(function (x, i) {
+    var rr = 3 + i, q = "'Costos por ruta'!";
+    [x.r.n, x.r.piloto || '', x.r.placa || ''].forEach(function (v, k) { var cc = res.getCell(rr, k + 1); cc.value = v; st(cc, { h: k === 1 ? 'left' : 'center' }); });
+    [[x.I, x.c.ing], [x.T, x.c.costos], [x.U, x.c.util]].forEach(function (p, k) { var cc = res.getCell(rr, 4 + k); cc.value = { formula: q + p[0], result: p[1] }; st(cc, { nf: QF, h: 'right' }); });
+  });
+  var last = 2 + refs.length, tr = last + 1;
+  res.mergeCells(tr, 1, tr, 3); var tl = res.getCell(tr, 1); tl.value = 'TOTAL'; st(tl, { bold: true, fill: CLARO }); st(res.getCell(tr, 2), { fill: CLARO }); st(res.getCell(tr, 3), { fill: CLARO });
+  ['D', 'E', 'F'].forEach(function (col, k) { var cc = res.getCell(col + tr); var sum = refs.reduce(function (a, x) { return a + [x.c.ing, x.c.costos, x.c.util][k]; }, 0); cc.value = { formula: 'SUM(' + col + '3:' + col + last + ')', result: sum }; st(cc, { bold: true, nf: QF, h: 'right', fill: CLARO }); });
+  var f = new Date(), dd = ('0' + f.getDate()).slice(-2), mm = ('0' + (f.getMonth() + 1)).slice(-2);
+  wb.xlsx.writeBuffer().then(function (buf) {
+    window.__xlsxBuf = buf;
+    var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'Costos_rutas_' + dd + '_' + mm + '_' + f.getFullYear() + '.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+}
+/* tarifario */
+function renderTarifario() {
+  if (!$('ttar')) return;
+  var q = norm($('tq').value), t = tarifas(), res = [];
+  for (var i = 0; i < t.length && res.length < 300; i++) if (!q || norm(t[i][0]).indexOf(q) >= 0 || norm(t[i][1]).indexOf(q) >= 0) res.push(i);
+  $('tcount').textContent = t.length + ' municipios' + (res.length === 300 ? ' (mostrando 300)' : '') + ' · Tarifas sin IVA. 2W = MOTO, 3W = TORO, 4W = QUTE/KAYO';
+  $('ttar').innerHTML = '<tr><th>Departamento</th><th>Municipio</th><th>Tarifa 2W (MOTO)</th><th>Tarifa 3W (TORO)</th><th>Tarifa 4W (QUTE/KAYO)</th><th></th></tr>' + res.map(function (i) {
+    var r = t[i];
+    return '<tr><td><input value="' + esc(r[0]) + '" onchange="editTar(' + i + ',0,this.value)"></td><td><input value="' + esc(r[1]) + '" onchange="editTar(' + i + ',1,this.value)"></td>' +
+      [2, 3, 4].map(function (c) { return '<td><input type="number" step="any" style="width:120px" value="' + (Number(r[c]) || 0) + '" onchange="editTar(' + i + ',' + c + ',this.value)"></td>'; }).join('') +
+      '<td><button class="b sec" onclick="borrarTar(' + i + ')">🗑</button></td></tr>';
+  }).join('');
+}
+function editTar(i, c, v) { var t = tarifas(); if (!t[i]) return; t[i][c] = c >= 2 ? (Number(v) || 0) : v.trim(); guardarTarifas(); renderCostos(); }
+function borrarTar(i) { var t = tarifas(); if (!t[i] || !confirm('¿Borrar la tarifa de ' + t[i][1] + '?')) return; t.splice(i, 1); guardarTarifas(); renderTarifario(); renderCostos(); }
+function agregarTar() {
+  var d = $('tnd').value.trim(), m = $('tnm').value.trim();
+  if (!m) { alert('Escribe el municipio.'); return; }
+  var t = tarifas(); S.cfg.tarifario = t;
+  t.push([d, m, Number($('tn2').value) || 0, Number($('tn3').value) || 0, Number($('tn4').value) || 0]);
+  ['tnd', 'tnm', 'tn2', 'tn3', 'tn4'].forEach(function (x) { $(x).value = ''; });
+  guardarTarifas(); renderTarifario(); renderCostos();
+}
+
 var arrastrando = null;
 function enlazarDnD() {
   document.querySelectorAll('.rdrag').forEach(function (h) {
@@ -839,7 +1027,7 @@ function importarExcel() {
     var dir = hoja(wb, 'Directorio_Tiendas');
     if (dir && $('xdir').checked) { var fi = filasDe(dir, [0, 1, 2, 3, 4, 5, 6, 7, 8], 4); log('Directorio: ' + fi.length + ' tiendas'); cadena = cadena.then(function () { return enviarEnTrozos('Directorio', fi); }); }
     var tar = hoja(wb, 'Tarifario');
-    if (tar && $('xtar').checked) { var ft = filasDe(tar, [0, 1, 2, 3, 4], 4); log('Tarifario: ' + ft.length + ' municipios'); cadena = cadena.then(function () { return enviarEnTrozos('Tarifario', ft); }); }
+    if (tar && $('xtar').checked) { var ft = filasDe(tar, [0, 1, 2, 3, 4], 4); log('Tarifario: ' + ft.length + ' municipios'); cadena = cadena.then(function () { return enviarEnTrozos('Tarifario', ft); }).then(function () { S.cfg.tarifario = ft.map(function (x) { return [x[0], x[1], Number(x[2]) || 0, Number(x[3]) || 0, Number(x[4]) || 0]; }); return api('guardarConfig', { tarifario: S.cfg.tarifario }); }); }
     var his = hoja(wb, 'Historial_Rutas');
     if (his && $('xhis').checked) {
       var fh = filasDe(his, [0, 1, 2, 3, 4, 5, 6], 4).map(function (r) { if (typeof r[0] === 'number') { var d = new Date(Math.round((r[0] - 25569) * 86400000)); r[0] = d.toISOString().slice(0, 10); } return r; });
@@ -858,7 +1046,7 @@ function renderConfig() {
 function renderTodo() {
   var act = document.activeElement;
   var enDeptos = act && act.closest && act.closest('#tdep');
-  renderRutas(); renderPedidos(); renderDicc(); renderConfig();
+  renderRutas(); renderPedidos(); renderDicc(); renderConfig(); renderCostos(); renderTarifario();
   if (!enDeptos) renderDeptos();
   $('dp').innerHTML = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
 }
@@ -868,6 +1056,7 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); });
 $('lk').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
 arranque();
 </script>
