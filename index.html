@@ -431,7 +431,7 @@ function descargarExcel() {
   function fila(p, r, primera) {
     var d = detectar(p.destino) || {}, cod = d.codigo === undefined || d.codigo === '' ? null : d.codigo;
     if (cod !== null && /^\d+$/.test(String(cod))) cod = Number(cod);
-    return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, p.com || null, r ? r.n : null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null, (r && primera && r.obs) ? r.obs : null];
+    return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, [p.com, (r && primera) ? r.obs : ''].filter(Boolean).join(' | ') || null, r ? r.n : null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null];
   }
   S.rutas.forEach(function (r) {
     var prim = true;
@@ -440,8 +440,8 @@ function descargarExcel() {
   if (incluir) sa.forEach(function (p) { filas.push(fila(p, null, false)); });
   if (!filas.length) { alert('No hay destinos en las rutas para descargar.'); return; }
   var wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('PROGRAMACION', { views: [{ state: 'frozen', ySplit: 1 }] });
-  var heads = ['Codigo Cliente', 'DESTINO', 'MOTOS', 'TOROS', 'QUTE', 'KAYO', 'COMENTARIO', 'RUTA', 'PILOTOS', 'PLACA', 'HORARIO DE POSICIONAMIENTO', 'COMPLETACIÓN DE RUTA', 'ACEPTACIÓN DE RUTA-GRUPO UMA', 'OBSERVACIONES'];
-  var anchos = [17, 58, 10, 10, 8, 8, 40, 9, 26, 16, 20, 18, 34, 45];
+  var heads = ['Codigo Cliente', 'DESTINO', 'MOTOS', 'TOROS', 'QUTE', 'KAYO', 'COMENTARIO', 'RUTA', 'PILOTOS', 'PLACA', 'HORARIO DE POSICIONAMIENTO', 'COMPLETACIÓN DE RUTA', 'ACEPTACIÓN DE RUTA-GRUPO UMA'];
+  var anchos = [17, 58, 10, 10, 8, 8, 55, 9, 26, 16, 20, 18, 34];
   var bd = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
   ws.addRow(heads);
   filas.forEach(function (f) { ws.addRow(f); });
