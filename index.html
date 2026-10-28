@@ -272,7 +272,7 @@ function cargar() {
   return api('cargar').then(function (r) {
     S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
     S.rutas = (r.rutas || []).map(function (x) {
-      if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.c = (x.destinos && x.destinos.c) || {}; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
+      if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.z = (x.destinos && x.destinos.z) || 0; x.c = (x.destinos && x.destinos.c) || {}; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
       return x;
     }).sort(function (a, b) { return a.n - b.n; });
     indexarDicc();
@@ -291,7 +291,7 @@ function guardarTodo() {
 function enviar() {
   if (guardando) { pendiente = true; return; }
   guardando = true;
-  api('guardarTodo', S.pedidos, S.rutas.map(function (r) { return { n: r.n, piloto: r.piloto, placa: r.placa, vehiculo: r.vehiculo, cap: r.cap, destinos: { d: r.destinos, o: r.obs || '', c: r.c || {} } }; })).then(function () {
+  api('guardarTodo', S.pedidos, S.rutas.map(function (r) { return { n: r.n, piloto: r.piloto, placa: r.placa, vehiculo: r.vehiculo, cap: r.cap, destinos: { d: r.destinos, o: r.obs || '', c: r.c || {}, z: r.z || 0 } }; })).then(function () {
     guardando = false;
     if (pendiente) { pendiente = false; enviar(); } else setEstado('Guardado', '#86efac');
   }).catch(function (e) { guardando = false; setEstado('Error al guardar: ' + e.message, '#fca5a5'); });
@@ -331,7 +331,7 @@ function sugerir(destino) {
   var n = rutaPorDepto(depto);
   if (!n) return 0;
   if (norm(depto) === 'guatemala') {
-    var r1 = rutaObj(1);
+    var r1 = rutaZona(1);
     var cnt = 0;
     if (r1) r1.destinos.forEach(function (d) { if (norm(deptoDe(d)) === 'guatemala') cnt++; });
     return cnt < 26 ? 1 : 2;
@@ -343,17 +343,36 @@ function quitarSinAuto(d) {
   var a = S.cfg.sinAuto || [], k = a.indexOf(norm(d));
   if (k >= 0) { a.splice(k, 1); S.cfg.sinAuto = a; api('guardarConfig', { sinAuto: a }).catch(function () {}); }
 }
+function rutaZona(z) {
+  for (var i = 0; i < S.rutas.length; i++) if (S.rutas[i].z === z) return S.rutas[i];
+  for (var j = 0; j < S.rutas.length; j++) if (S.rutas[j].n === z && !S.rutas[j].z) return S.rutas[j];
+  return null;
+}
+function compactarRutas() {
+  S.rutas.forEach(function (r) { if (!r.z) r.z = r.n; });
+  S.rutas.sort(function (a, b) { return a.n - b.n; });
+  var ch = false;
+  S.rutas.forEach(function (r, i) { if (r.n !== i + 1) { r.n = i + 1; ch = true; } });
+  return ch;
+}
 function autoColocar(force) {
-  var cambio = false;
+  var cambio = false, lista = [];
   S.pedidos.forEach(function (p) {
     if (rutaDe(p.destino)) return;
     if (!force && enSinAuto(p.destino)) return;
-    var n = sugerir(p.destino);
-    if (!n) return;
-    rutaObj(n, true).destinos.push(p.destino);
-    S.nuevos[norm(p.destino)] = 1;
+    lista.push({ p: p, o: rutaPorDepto(deptoDe(p.destino)) || 999 });
+  });
+  lista.sort(function (a, b) { return a.o - b.o; });
+  lista.forEach(function (x) {
+    var z = sugerir(x.p.destino);
+    if (!z) return;
+    var r = rutaZona(z);
+    if (!r) { r = rutaObj(libres(1)[0], true); r.z = z; }
+    r.destinos.push(x.p.destino);
+    S.nuevos[norm(x.p.destino)] = 1;
     cambio = true;
   });
+  if (compactarRutas()) cambio = true;
   return cambio;
 }
 function reAuto() {
