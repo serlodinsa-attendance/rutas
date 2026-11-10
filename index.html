@@ -1141,6 +1141,60 @@ function dslSolicitar() {
 }
 function dslCancelarSol() { dslCfg().sol = null; dslGuardar('dsl_cfg'); renderDiesel(); }
 
+/* --- editar registros --- */
+function dslEditar(t, id) {
+  var k0 = null, m = null;
+  Object.keys(S.cfg).forEach(function (k) {
+    if (k.indexOf('dsl_' + t + '_') !== 0 || !Array.isArray(S.cfg[k])) return;
+    S.cfg[k].forEach(function (x) { if (x.id === id) { k0 = k; m = x; } });
+  });
+  if (!m) return;
+  var F = function (l, i, v, ty, w) { return '<label class="mut">' + l + '<br><input id="ed_' + i + '" type="' + (ty || 'text') + '" value="' + esc(v == null ? '' : v) + '" style="width:' + (w || 170) + 'px"' + (ty === 'number' ? ' step="any"' : '') + '></label>'; };
+  var S2 = function (l, i, opts, v) { return '<label class="mut">' + l + '<br><select id="ed_' + i + '">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === v ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>'; };
+  var h = F('Fecha', 'f', m.f, 'date', 150), tit = 'Editar registro';
+  if (t === 'p' && m.t === 'des') {
+    tit = 'Editar despacho en predio';
+    h += F('Hora', 'h', m.h, 'time', 110) + F('Placa', 'pl', m.pl, 'text', 130) + F('Piloto', 'pi', m.pi) + S2('Sale de', 'a', [['t', 'Tanque principal'], ['b', 'Bidones']], m.a === 'b' ? 'b' : 't') + F('Galones', 'g', m.g, 'number', 90) + F('Ruta', 'r', m.r, 'text', 200);
+  } else if (t === 'p' && m.t === 'ent') {
+    tit = 'Editar entrada de diesel';
+    h += F('Galones', 'g', m.g, 'number', 100) + F('Nota / proveedor', 'n', m.n, 'text', 240);
+  } else if (t === 'p' && m.t === 'reb') {
+    tit = 'Editar rellenado de bidones';
+    h += F('Galones', 'g', m.g, 'number', 100);
+  } else if (t === 'p' && m.t === 'aj') {
+    tit = 'Editar ajuste';
+    h += S2('Dónde', 'a', [['t', 'Tanque'], ['b', 'Bidones']], m.a === 'b' ? 'b' : 't') + F('Galones (+ suma / - resta)', 'g', m.g, 'number', 110) + F('Nota', 'n', m.n, 'text', 240);
+  } else {
+    tit = 'Editar despacho en gasolinera';
+    var gs = dslCfg().gas.slice(); if (gs.indexOf(m.gs) < 0) gs.push(m.gs);
+    h += F('Hora', 'h', m.h, 'time', 110) + S2('Gasolinera', 'gs', gs.map(function (x) { return [x, x]; }), m.gs) + F('Placa', 'pl', m.pl, 'text', 130) + F('Piloto', 'pi', m.pi) + F('Ruta / lugar', 'r', m.r, 'text', 200) + F('Galones', 'g', m.g, 'number', 90) + F('Total (Q)', 'q', m.q, 'number', 110) + F('No. factura', 'fac', m.fac, 'text', 120);
+  }
+  var ov = document.createElement('div'); ov.id = 'dsl_ed';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:90;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML = '<div class="card" style="max-width:600px;width:100%;max-height:90vh;overflow:auto"><h2>' + tit + '</h2><div class="row">' + h + '</div><div class="row" style="margin-top:12px"><button class="b ok" id="ed_ok">Guardar cambios</button><button class="b sec" id="ed_no">Cancelar</button></div></div>';
+  document.body.appendChild(ov);
+  $('ed_no').onclick = function () { ov.remove(); };
+  $('ed_ok').onclick = function () {
+    var g = function (i) { var e = $('ed_' + i); return e ? e.value.trim() : null; };
+    var nf = g('f'); if (!nf) { alert('Escribe la fecha.'); return; }
+    var gal = parseFloat(g('g')); if (isNaN(gal) || (!(gal > 0) && !(t === 'p' && m.t === 'aj'))) { alert('Escribe los galones.'); return; }
+    var nm = JSON.parse(JSON.stringify(m)); nm.f = nf; nm.g = dslR(gal);
+    ['h', 'n', 'r', 'fac'].forEach(function (i) { if (g(i) !== null) nm[i] = g(i); });
+    if (g('pl') !== null) nm.pl = g('pl').toUpperCase();
+    if (g('pi') !== null) nm.pi = g('pi');
+    if (g('a') !== null) nm.a = g('a');
+    if (g('gs') !== null) nm.gs = g('gs');
+    if (g('q') !== null) nm.q = dslR(parseFloat(g('q')) || 0);
+    if (nm.t === 'des' && (!nm.pl || !nm.pi)) { if (!confirm('Falta la placa o el piloto. ¿Guardar de todos modos?')) return; }
+    var k1 = 'dsl_' + t + '_' + nf.slice(0, 7);
+    S.cfg[k0] = S.cfg[k0].filter(function (x) { return x.id !== id; });
+    if (!Array.isArray(S.cfg[k1])) S.cfg[k1] = [];
+    S.cfg[k1].push(nm); dslGuardar(k0); if (k1 !== k0) dslGuardar(k1);
+    if (nm.pi) dslPilotoNuevo(nm.pi);
+    ov.remove(); renderDiesel();
+  };
+}
+
 /* --- acciones ruta --- */
 function dslRuta() {
   var f = dslFecha('dg_f'), gs = $('dg_gs').value, pl = $('dg_pl').value.trim().toUpperCase(), pi = $('dg_pi').value.trim(), r = $('dg_r').value.trim(), g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value) || 0, fac = $('dg_fac').value.trim();
@@ -1229,7 +1283,7 @@ function dslRenderPredio(mp, sal, bajo, c) {
     var m = x.m, tipo = { ent: '📥 Entrada', des: '⛽ Despacho', reb: '🛢️ Rellenado bidones', aj: '⚖️ Ajuste' }[m.t] || m.t;
     var clip = m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '';
     var cell = function (v) { return '<td class="r' + (v < 0 ? ' neg' : '') + '">' + (v ? (v > 0 ? '+' : '') + dslG(v) : '') + '</td>'; };
-    rows += '<tr class="' + (m.t === 'ent' ? 'ent' : '') + '"><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + tipo + clip + '</td><td>' + esc(m.pl || '') + '</td><td>' + esc(m.pi || '') + '</td><td>' + esc(m.r || m.n || '') + '</td>' + cell(x.dt) + cell(x.db) + '<td class="r">' + dslG(x.t) + '</td><td class="r">' + dslG(x.b) + '</td><td><button class="b sec" onclick="dslDel(\'p\',\'' + m.id + '\')">🗑</button></td></tr>';
+    rows += '<tr class="' + (m.t === 'ent' ? 'ent' : '') + '"><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + tipo + clip + '</td><td>' + esc(m.pl || '') + '</td><td>' + esc(m.pi || '') + '</td><td>' + esc(m.r || m.n || '') + '</td>' + cell(x.dt) + cell(x.db) + '<td class="r">' + dslG(x.t) + '</td><td class="r">' + dslG(x.b) + '</td><td><button class="b sec" onclick="dslEditar(\'p\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'p\',\'' + m.id + '\')">🗑</button></td></tr>';
     nrow++;
   });
   cierra();
@@ -1254,7 +1308,7 @@ function dslRenderRuta(mr, c) {
   orden.forEach(function (m) {
     if (m.f !== dia) { cierra(); dia = m.f; sg = 0; sq = 0; }
     sg += m.g; sq += m.q || 0;
-    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + '</td><td><button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
+    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
   });
   cierra();
   $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>Factura</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
