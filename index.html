@@ -490,7 +490,7 @@ function aplicarRol() {
   }
   PRIMERA = false;
   $('usr').innerHTML = USR ? '<span>👤 ' + esc(USR.nombre) + ' <span class="rol' + (an ? ' an' : '') + '">' + (an ? 'Analista' : 'Superusuario') + '</span></span><button onclick="cambiarClaveUI()">Cambiar clave</button><button onclick="salir()">Salir</button>' : '';
-  if ($('cfg-adm')) { $('cfg-adm').style.display = an ? 'none' : ''; if (!an) usrCargar(); }
+  if ($('cfg-adm')) { $('cfg-adm').style.display = an ? 'none' : ''; if (!an) usrCargar(); var uc = $('us_tab') && $('us_tab').closest('.card'); if (uc) uc.style.display = (USR && USR.adm) ? '' : 'none'; }
 }
 function cambiarClaveUI() {
   var ov = document.createElement('div');
@@ -553,7 +553,7 @@ function fusionarPedidos(arr) {
 function cargar() {
   setEstado('Cargando...');
   return api('cargar').then(function (r) {
-    USR = { u: r.u || '', nombre: r.nombre || '', rol: r.rol || 'super' }; S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
+    USR = { u: r.u || '', nombre: r.nombre || '', rol: r.rol || 'super', adm: !!r.adm }; S.dicc = r.dicc; S.pedidos = r.pedidos; S.cfg = r.config || {}; S.stats = r.stats || {}; S.hoja = r.hoja || '';
     S.rutas = (r.rutas || []).map(function (x) {
       if (!Array.isArray(x.destinos)) { x.obs = (x.destinos && x.destinos.o) || ''; x.z = (x.destinos && x.destinos.z) || 0; x.c = (x.destinos && x.destinos.c) || {}; x.destinos = (x.destinos && x.destinos.d) || []; } else x.obs = x.obs || '';
       return x;
