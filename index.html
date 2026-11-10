@@ -1425,7 +1425,7 @@ function dslRenderRuta(mr, c) {
   var tg = 0, tq = 0, porGs = {};
   vis.forEach(function (m) { tg += m.g; tq += m.q || 0; var o = porGs[m.gs] = porGs[m.gs] || [0, 0]; o[0] += m.g; o[1] += m.q || 0; });
   var k = function (v, t) { return '<div class="kpi"><b>' + v + '</b><span>' + t + '</span></div>'; };
-  $('dr2_kpi').innerHTML = k(dslG(tg), 'galones (vista actual)') + k(q2(tq), 'total pagado') + k(tg ? q2(tq / tg) : 'Q 0.00', 'precio promedio / gal') + Object.keys(porGs).map(function (g) { return k(dslG(porGs[g][0]) + ' · ' + q2(porGs[g][1]), g); }).join('');
+  $('dr2_kpi').innerHTML = k(dslG(tg), 'galones (vista actual)') + k(q2(tq), 'total pagado') + k(tg ? q2(tq / tg) : 'Q 0.00', 'precio promedio / gal') + Object.keys(porGs).map(function (g) { return '<div class="kpi"><span style="font-weight:700;color:#0f172a">⛽ ' + esc(g) + '</span><b>' + dslG(porGs[g][0]) + ' gal</b><b style="font-size:15px;color:#047857">' + q2(porGs[g][1]) + '</b><span>pagado</span></div>'; }).join('');
   var orden = vis.slice().sort(function (a, b) { return a.f < b.f ? 1 : a.f > b.f ? -1 : (a.id < b.id ? 1 : -1); }), rows = '', dia = null, sg = 0, sq = 0;
   var cierra = function () { if (dia !== null) rows += '<tr class="dia"><td colspan="6">Total del ' + dslFechaCorta(dia) + '</td><td class="r">' + dslG(sg) + '</td><td class="r">' + q2(sq) + '</td><td colspan="3"></td></tr>'; };
   orden.forEach(function (m) {
