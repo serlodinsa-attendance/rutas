@@ -82,6 +82,22 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
 .ct td{padding:4px 8px}.ct tr.sint td{background:#fef2f2}
 .cres{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}.cres div{background:#f1f5f9;border-radius:10px;padding:8px 14px;display:flex;flex-direction:column;min-width:130px}
 .cres span{font-size:11px;color:var(--mut)}.cres b{font-size:16px}.cres .pos{background:#dcfce7}.cres .neg{background:#fee2e2}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
+.dgrid .card{margin-bottom:0}
+.dban{border-radius:12px;padding:12px 16px;margin-bottom:12px;font-weight:600;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.dban.rojo{background:#fee2e2;color:#991b1b;border:2px solid #dc2626}
+.dban.ambar{background:#fef3c7;color:#92400e;border:2px solid #f59e0b}
+.dban.verde{background:#dcfce7;color:#166534}
+nav button.low{color:#fca5a5}
+.dsub .dia td{background:#f1f5f9;font-weight:700}
+.dsub td.r,.dsub th.r{text-align:right}
+.dsub .ent td{background:#f0fdf4}
+.dsub .neg{color:var(--bad);font-weight:700}
+.dchip{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;border-radius:999px;padding:3px 6px 3px 10px;margin:2px;font-size:13px}
+.dchip button{border:none;background:#cbd5e1;border-radius:50%;width:20px;height:20px;cursor:pointer;line-height:1}
+#dsl_vis{display:none;position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:80;align-items:center;justify-content:center;padding:14px}
+#dsl_vis img{max-width:100%;max-height:100%;border-radius:8px;background:#fff}
+.dthumb{height:34px;border-radius:4px;cursor:pointer;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -96,6 +112,7 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
     <button data-v="rent">Rentabilidad</button>
     <button data-v="dicc">Diccionario</button>
     <button data-v="tarifario">Tarifario</button>
+    <button data-v="diesel">Diesel</button>
     <button data-v="config">Configuración</button>
   </nav>
   <div id="estado">Cargando...</div>
@@ -171,6 +188,148 @@ textarea.obsb{display:block;width:100%;min-height:58px;border:none;border-top:1p
   </div>
   <div class="row" style="margin-bottom:8px"><input id="tq" placeholder="Buscar departamento o municipio..." oninput="renderTarifario()" style="flex:1;max-width:420px"><span class="mut" id="tcount"></span></div>
   <div class="tw"><table id="ttar"></table></div>
+</section>
+
+<section id="v-diesel" class="view">
+  <div class="bar" id="ds-nav">
+    <button class="b" data-ds="predio">⛽ Diesel en predio</button>
+    <button class="b sec" data-ds="ruta">🛣️ Diesel en ruta (gasolineras)</button>
+    <button class="b sec" data-ds="resumen">📊 Totales</button>
+    <button class="b sec" data-ds="flota">🚚 Flota y pilotos</button>
+  </div>
+
+  <div class="dsub" id="ds-predio">
+    <div id="dp_ban"></div>
+    <div class="bar" id="dp_kpi"></div>
+    <div class="card">
+      <h2>Registrar despacho en predio</h2>
+      <div class="row">
+        <label class="mut">Fecha<br><input type="date" id="dp_f"></label>
+        <label class="mut">Hora<br><input type="time" id="dp_h"></label>
+        <label class="mut">Placa<br><input id="dp_pl" list="dl_placas" placeholder="Placa" style="width:130px" autocomplete="off"></label>
+        <label class="mut">Piloto<br><input id="dp_pi" list="dl_pilotos" placeholder="Nombre del piloto" style="width:190px" autocomplete="off"></label>
+        <label class="mut">Sale de<br><select id="dp_a"><option value="t">Tanque principal</option><option value="b">Bidones</option></select></label>
+        <label class="mut">Galones<br><input type="number" step="any" min="0" id="dp_g" style="width:90px"></label>
+        <label class="mut">Ruta<br><input id="dp_r" list="dl_rutas" placeholder="Ej. Franja transversal" style="width:200px" autocomplete="off"></label>
+        <button class="b ok" onclick="dslDespacho()" style="align-self:flex-end">Guardar despacho</button>
+      </div>
+      <p class="mut" id="dp_info" style="margin:6px 0 0"></p>
+    </div>
+    <div class="dgrid">
+      <div class="card">
+        <h2>📥 Entrada de diesel al tanque (recarga)</h2>
+        <div class="row">
+          <label class="mut">Fecha<br><input type="date" id="de_f"></label>
+          <label class="mut">Galones<br><input type="number" step="any" min="0" id="de_g" style="width:100px"></label>
+          <label class="mut">Nota / proveedor<br><input id="de_n" style="width:160px" placeholder="Opcional"></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="mut">Comprobante (foto)<br><input type="file" accept="image/*" id="de_img"></label>
+          <button class="b ok" onclick="dslEntrada()" style="align-self:flex-end">Registrar entrada</button>
+        </div>
+        <p class="mut" id="de_msg" style="margin:6px 0 0"></p>
+      </div>
+      <div class="card">
+        <h2>🛢️ Rellenar bidones desde el tanque</h2>
+        <div class="row">
+          <label class="mut">Fecha<br><input type="date" id="dr_f"></label>
+          <label class="mut">Galones<br><input type="number" step="any" min="0" id="dr_g" style="width:100px"></label>
+          <button class="b ok" onclick="dslRebidones()" style="align-self:flex-end">Rellenar</button>
+        </div>
+        <p class="mut" style="margin:6px 0 0">Resta del tanque y suma a los bidones.</p>
+      </div>
+      <div class="card">
+        <h2>⚖️ Ajustar saldo (conteo real)</h2>
+        <div class="row">
+          <label class="mut">Fecha<br><input type="date" id="dj_f"></label>
+          <label class="mut">Dónde<br><select id="dj_a"><option value="t">Tanque</option><option value="b">Bidones</option></select></label>
+          <label class="mut">Galones reales<br><input type="number" step="any" min="0" id="dj_g" style="width:100px"></label>
+          <button class="b sec" onclick="dslAjuste()" style="align-self:flex-end">Ajustar</button>
+        </div>
+        <p class="mut" style="margin:6px 0 0">Si midiste el tanque y no coincide, el sistema registra la diferencia.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Movimientos del predio</h2>
+        <select id="dp_mes" onchange="DSL.mesP=this.value;renderDiesel()"></select>
+        <span class="mut">Cada día muestra su total, como en tu Excel.</span></div>
+      <div class="tw"><table id="dp_tab"></table></div>
+    </div>
+  </div>
+
+  <div class="dsub" id="ds-ruta" style="display:none">
+    <div class="bar" id="dr2_kpi"></div>
+    <div class="card">
+      <h2>Registrar despacho en gasolinera</h2>
+      <div class="row">
+        <label class="mut">Fecha<br><input type="date" id="dg_f"></label>
+        <label class="mut">Hora<br><input type="time" id="dg_h"></label>
+        <label class="mut">Gasolinera<br><select id="dg_gs"></select></label>
+        <label class="mut">Placa<br><input id="dg_pl" list="dl_placas" placeholder="Placa" style="width:130px" autocomplete="off"></label>
+        <label class="mut">Piloto<br><input id="dg_pi" list="dl_pilotos" placeholder="Nombre del piloto" style="width:190px" autocomplete="off"></label>
+        <label class="mut">Ruta / lugar<br><input id="dg_r" list="dl_rutas" placeholder="Ej. Franja transversal" style="width:200px" autocomplete="off"></label>
+        <label class="mut">Galones<br><input type="number" step="any" min="0" id="dg_g" style="width:90px"></label>
+        <label class="mut">Total (Q)<br><input type="number" step="any" min="0" id="dg_q" style="width:110px"></label>
+        <label class="mut">No. factura<br><input id="dg_fac" style="width:120px"></label>
+        <button class="b ok" onclick="dslRuta()" style="align-self:flex-end">Guardar</button>
+      </div>
+      <p class="mut" id="dg_info" style="margin:6px 0 0"></p>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Despachos en ruta</h2>
+        <select id="dg_fgs" onchange="DSL.gsF=this.value;renderDiesel()"></select>
+        <select id="dg_mes" onchange="DSL.mesR=this.value;renderDiesel()"></select></div>
+      <div class="tw"><table id="dg_tab"></table></div>
+    </div>
+  </div>
+
+  <div class="dsub" id="ds-resumen" style="display:none">
+    <div class="card">
+      <h2>Totales por período</h2>
+      <div class="row">
+        <label class="mut">Desde<br><input type="date" id="dt_d" onchange="renderDiesel()"></label>
+        <label class="mut">Hasta<br><input type="date" id="dt_h" onchange="renderDiesel()"></label>
+        <label class="mut">Agrupar por<br><select id="dt_g" onchange="renderDiesel()"><option value="d">Día</option><option value="s">Semana</option><option value="m">Mes</option></select></label>
+        <button class="b sec" onclick="dslRangoMes()" style="align-self:flex-end">Este mes</button>
+      </div>
+      <div id="dt_out"></div>
+    </div>
+  </div>
+
+  <div class="dsub" id="ds-flota" style="display:none">
+    <div class="dgrid">
+      <div class="card">
+        <h2>Camiones y capacidad de tanque</h2>
+        <div class="row" style="margin-bottom:8px">
+          <input id="fl_pl" placeholder="Placa" style="width:110px">
+          <input id="fl_ma" placeholder="Marca (opcional)" style="width:130px">
+          <input id="fl_ca" type="number" min="0" placeholder="Galones" style="width:90px">
+          <button class="b ok" onclick="dslAddCamion()">+ Agregar</button>
+        </div>
+        <div class="tw" style="max-height:60vh"><table id="fl_tab"></table></div>
+      </div>
+      <div>
+        <div class="card">
+          <h2>Pilotos guardados</h2>
+          <p class="mut" style="margin:0 0 8px">Se guardan solos cuando escribes un nombre nuevo en un despacho. Aparecen como sugerencia.</p>
+          <div class="row" style="margin-bottom:8px"><input id="pi_n" placeholder="Nombre del piloto" style="width:220px"><button class="b ok" onclick="dslAddPiloto()">+ Agregar</button></div>
+          <div id="pi_list"></div>
+        </div>
+        <div class="card">
+          <h2>Gasolineras</h2>
+          <div class="row" style="margin-bottom:8px"><input id="gs_n" placeholder="Nombre" style="width:200px"><button class="b ok" onclick="dslAddGas()">+ Agregar</button></div>
+          <div id="gs_list"></div>
+        </div>
+        <div class="card">
+          <h2>Alerta de diesel bajo</h2>
+          <div class="row"><label class="mut">Avisar cuando el tanque tenga menos de (galones)<br><input type="number" min="0" id="al_g" style="width:120px" onchange="dslSetAlerta(this.value)"></label></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="dl_placas"></datalist><datalist id="dl_pilotos"></datalist><datalist id="dl_rutas"></datalist>
+  <div id="dsl_vis" onclick="this.style.display='none'"><img id="dsl_vis_img" alt="Comprobante"></div>
 </section>
 
 <section id="v-config" class="view">
@@ -825,6 +984,339 @@ function renderRent() {
   if (keep && $(keep)) { $(keep).value = kv; $(keep).focus(); }
 }
 
+/* ---------- diesel ---------- */
+var DSL = { sub: 'predio', mesP: '', mesR: '', gsF: '' };
+var dslSucio = {};
+function dslCfg() {
+  if (!S.cfg.dsl_cfg || typeof S.cfg.dsl_cfg !== 'object' || Array.isArray(S.cfg.dsl_cfg)) S.cfg.dsl_cfg = {};
+  var c = S.cfg.dsl_cfg;
+  if (!Array.isArray(c.flota)) c.flota = [];
+  if (!Array.isArray(c.pilotos)) c.pilotos = [];
+  if (!Array.isArray(c.gas) || !c.gas.length) c.gas = ['DON ARTURO', 'UNO PLUS', 'PUMA'];
+  if (!(c.alerta >= 0)) c.alerta = 300;
+  return c;
+}
+function dslGuardar(clave) {
+  if (clave) dslSucio[clave] = 1;
+  clearTimeout(dslGuardar.t); setEstado('Guardando...', '#fde68a');
+  dslGuardar.t = setTimeout(function () {
+    var o = {}; Object.keys(dslSucio).forEach(function (k) { o[k] = S.cfg[k]; }); dslSucio = {};
+    api('guardarConfig', o).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+  }, 600);
+}
+function dslR(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function dslG(n) { return (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function dslId() { return 't' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+function dslMovs(t) {
+  var out = [];
+  Object.keys(S.cfg).forEach(function (k) { if (k.indexOf('dsl_' + t + '_') === 0 && Array.isArray(S.cfg[k])) out = out.concat(S.cfg[k]); });
+  out.sort(function (a, b) { return a.f < b.f ? -1 : a.f > b.f ? 1 : (a.id < b.id ? -1 : 1); });
+  return out;
+}
+function dslAdd(t, m) {
+  m.id = dslId();
+  var k = 'dsl_' + t + '_' + m.f.slice(0, 7);
+  if (!Array.isArray(S.cfg[k])) S.cfg[k] = [];
+  S.cfg[k].push(m); dslGuardar(k);
+}
+function dslDel(t, id) {
+  if (!confirm('¿Borrar este registro?')) return;
+  Object.keys(S.cfg).forEach(function (k) {
+    if (k.indexOf('dsl_' + t + '_') !== 0 || !Array.isArray(S.cfg[k])) return;
+    var n = S.cfg[k].length; S.cfg[k] = S.cfg[k].filter(function (m) { return m.id !== id; });
+    if (S.cfg[k].length !== n) dslGuardar(k);
+  });
+  renderDiesel();
+}
+function dslSaldos(movs) {
+  var t = 0, b = 0;
+  movs.forEach(function (m) {
+    var g = Number(m.g) || 0;
+    if (m.t === 'ent') t += g;
+    else if (m.t === 'des') { if (m.a === 'b') b -= g; else t -= g; }
+    else if (m.t === 'reb') { t -= g; b += g; }
+    else if (m.t === 'aj') { if (m.a === 'b') b += g; else t += g; }
+  });
+  return { t: dslR(t), b: dslR(b) };
+}
+function dslCap(placa) {
+  var k = norm(placa), f = dslCfg().flota;
+  for (var i = 0; i < f.length; i++) if (norm(f[i][0]) === k) return f[i];
+  return null;
+}
+function dslPilotoNuevo(n) {
+  n = String(n || '').replace(/\s+/g, ' ').trim(); if (!n) return;
+  var c = dslCfg(), k = norm(n);
+  if (!c.pilotos.some(function (p) { return norm(p) === k; })) { c.pilotos.push(n); c.pilotos.sort(function (a, b) { return a.localeCompare(b); }); dslGuardar('dsl_cfg'); }
+}
+function dslUltPiloto(placa) {
+  var k = norm(placa), r = '';
+  dslMovs('p').concat(dslMovs('r')).forEach(function (m) { if (m.pl && norm(m.pl) === k && m.pi) r = m.pi; });
+  return r;
+}
+function dslSub(s) {
+  DSL.sub = s;
+  document.querySelectorAll('.dsub').forEach(function (d) { d.style.display = d.id === 'ds-' + s ? '' : 'none'; });
+  document.querySelectorAll('#ds-nav button').forEach(function (b) { b.classList.toggle('sec', b.getAttribute('data-ds') !== s); });
+  renderDiesel();
+}
+function dslVerImg(id) { var d = S.cfg['dsl_img_' + id]; if (!d) { alert('No hay imagen guardada.'); return; } $('dsl_vis_img').src = d; $('dsl_vis').style.display = 'flex'; }
+function dslComprimir(file) {
+  return new Promise(function (ok, fail) {
+    var fr = new FileReader();
+    fr.onerror = function () { fail(new Error('No se pudo leer la imagen.')); };
+    fr.onload = function () {
+      var im = new Image();
+      im.onerror = function () { fail(new Error('Archivo de imagen no válido.')); };
+      im.onload = function () {
+        var anchos = [900, 760, 640, 540, 460], cal = [0.7, 0.6, 0.5, 0.42, 0.35];
+        for (var i = 0; i < anchos.length; i++) {
+          var esc2 = Math.min(1, anchos[i] / Math.max(im.width, im.height));
+          var c = document.createElement('canvas'); c.width = Math.round(im.width * esc2); c.height = Math.round(im.height * esc2);
+          var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(im, 0, 0, c.width, c.height);
+          var d = c.toDataURL('image/jpeg', cal[i]);
+          if (d.length <= 44000) { ok(d); return; }
+        }
+        fail(new Error('La imagen es muy grande, toma una foto más cercana o recórtala.'));
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function dslFecha(id) { var v = $(id).value; return v || hoyISO(); }
+
+/* --- acciones predio --- */
+function dslDespacho() {
+  var f = dslFecha('dp_f'), pl = $('dp_pl').value.trim().toUpperCase(), pi = $('dp_pi').value.trim(), a = $('dp_a').value, g = parseFloat($('dp_g').value), r = $('dp_r').value.trim();
+  if (!pl) { alert('Elige o escribe la placa.'); return; }
+  if (!pi) { alert('Escribe el nombre del piloto.'); return; }
+  if (!(g > 0)) { alert('Escribe los galones.'); return; }
+  var s = dslSaldos(dslMovs('p')), cam = dslCap(pl);
+  if (!cam && !confirm('La placa ' + pl + ' no está en la lista de camiones. ¿Guardar de todos modos?')) return;
+  if (cam && cam[2] && g > Number(cam[2]) && !confirm(pl + ' tiene capacidad de ' + cam[2] + ' galones y le vas a despachar ' + g + '. ¿Continuar?')) return;
+  if (a === 't' && g > s.t && !confirm('El tanque tiene ' + dslG(s.t) + ' galones y vas a despachar ' + dslG(g) + '. Quedaría en negativo. ¿Continuar?')) return;
+  if (a === 'b') {
+    if (s.t > 0 && !confirm('Todavía hay ' + dslG(s.t) + ' galones en el tanque principal. Lo ideal es gastar primero el tanque y no tocar los bidones. ¿Despachar de bidones?')) return;
+    if (g > s.b && !confirm('Los bidones tienen ' + dslG(s.b) + ' galones. Quedarían en negativo. ¿Continuar?')) return;
+  }
+  var m = { f: f, h: $('dp_h').value || '', t: 'des', a: a, pl: pl, pi: pi, g: dslR(g), r: r };
+  dslAdd('p', m); dslPilotoNuevo(pi);
+  $('dp_g').value = ''; $('dp_pl').value = ''; $('dp_pi').value = ''; $('dp_r').value = ''; $('dp_h').value = '';
+  renderDiesel();
+}
+function dslEntrada() {
+  var f = dslFecha('de_f'), g = parseFloat($('de_g').value), n = $('de_n').value.trim(), file = $('de_img').files && $('de_img').files[0];
+  if (!(g > 0)) { alert('Escribe los galones que entraron.'); return; }
+  if (!file && !confirm('No adjuntaste comprobante. ¿Registrar la entrada sin foto?')) return;
+  var fin = function (img) {
+    var m = { f: f, t: 'ent', g: dslR(g), n: n };
+    if (img) { m.img = dslId(); S.cfg['dsl_img_' + m.img] = img; dslSucio['dsl_img_' + m.img] = 1; }
+    dslAdd('p', m);
+    var c = dslCfg(); if (c.sol) { c.sol = null; dslGuardar('dsl_cfg'); }
+    $('de_g').value = ''; $('de_n').value = ''; $('de_img').value = ''; $('de_msg').textContent = '✅ Entrada registrada.';
+    renderDiesel();
+  };
+  if (file) { $('de_msg').textContent = 'Procesando imagen...'; dslComprimir(file).then(fin).catch(function (e) { $('de_msg').textContent = ''; alert(e.message); }); } else fin(null);
+}
+function dslRebidones() {
+  var f = dslFecha('dr_f'), g = parseFloat($('dr_g').value);
+  if (!(g > 0)) { alert('Escribe los galones.'); return; }
+  var s = dslSaldos(dslMovs('p'));
+  if (g > s.t && !confirm('El tanque tiene ' + dslG(s.t) + ' galones. ¿Rellenar bidones con ' + dslG(g) + ' de todos modos?')) return;
+  dslAdd('p', { f: f, t: 'reb', g: dslR(g) }); $('dr_g').value = ''; renderDiesel();
+}
+function dslAjuste() {
+  var f = dslFecha('dj_f'), a = $('dj_a').value, real = parseFloat($('dj_g').value);
+  if (isNaN(real) || real < 0) { alert('Escribe los galones reales.'); return; }
+  var s = dslSaldos(dslMovs('p')), dif = dslR(real - (a === 'b' ? s.b : s.t));
+  if (!dif) { alert('El saldo ya coincide, no hay nada que ajustar.'); return; }
+  if (!confirm((a === 'b' ? 'Bidones' : 'Tanque') + ': el sistema tiene ' + dslG(a === 'b' ? s.b : s.t) + ' y tú indicas ' + dslG(real) + '. Se registrará un ajuste de ' + (dif > 0 ? '+' : '') + dslG(dif) + ' galones. ¿Continuar?')) return;
+  dslAdd('p', { f: f, t: 'aj', a: a, g: dif, n: 'Ajuste por conteo real' }); $('dj_g').value = ''; renderDiesel();
+}
+function dslSolicitar() {
+  var g = prompt('¿Cuántos galones se solicitan? (puedes dejarlo vacío)', '');
+  if (g === null) return;
+  dslCfg().sol = { f: hoyISO(), g: parseFloat(g) || 0 }; dslGuardar('dsl_cfg'); renderDiesel();
+}
+function dslCancelarSol() { dslCfg().sol = null; dslGuardar('dsl_cfg'); renderDiesel(); }
+
+/* --- acciones ruta --- */
+function dslRuta() {
+  var f = dslFecha('dg_f'), gs = $('dg_gs').value, pl = $('dg_pl').value.trim().toUpperCase(), pi = $('dg_pi').value.trim(), r = $('dg_r').value.trim(), g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value) || 0, fac = $('dg_fac').value.trim();
+  if (!gs) { alert('Elige la gasolinera.'); return; }
+  if (!pl) { alert('Elige o escribe la placa.'); return; }
+  if (!pi) { alert('Escribe el nombre del piloto.'); return; }
+  if (!(g > 0)) { alert('Escribe los galones.'); return; }
+  var cam = dslCap(pl);
+  if (!cam && !confirm('La placa ' + pl + ' no está en la lista de camiones. ¿Guardar de todos modos?')) return;
+  if (cam && cam[2] && g > Number(cam[2]) && !confirm(pl + ' tiene capacidad de ' + cam[2] + ' galones y registras ' + g + '. ¿Continuar?')) return;
+  dslAdd('r', { f: f, h: $('dg_h').value || '', gs: gs, pl: pl, pi: pi, r: r, g: dslR(g), q: dslR(q), fac: fac });
+  dslPilotoNuevo(pi);
+  ['dg_g', 'dg_q', 'dg_fac', 'dg_pl', 'dg_pi', 'dg_r', 'dg_h'].forEach(function (i) { $(i).value = ''; });
+  renderDiesel();
+}
+
+/* --- flota / pilotos / gasolineras --- */
+function dslAddCamion() {
+  var pl = $('fl_pl').value.trim().toUpperCase(), ma = $('fl_ma').value.trim(), ca = parseFloat($('fl_ca').value);
+  if (!pl || !(ca > 0)) { alert('Escribe la placa y la capacidad en galones.'); return; }
+  var c = dslCfg(); if (dslCap(pl)) { alert('Esa placa ya existe.'); return; }
+  c.flota.push([pl, ma, ca, 'ACTIVO']); dslGuardar('dsl_cfg'); ['fl_pl', 'fl_ma', 'fl_ca'].forEach(function (i) { $(i).value = ''; }); renderDiesel();
+}
+function dslEditCamion(i, col, v) { var c = dslCfg(); if (!c.flota[i]) return; c.flota[i][col] = col === 2 ? (parseFloat(v) || 0) : v.trim(); if (col === 0) c.flota[i][0] = c.flota[i][0].toUpperCase(); dslGuardar('dsl_cfg'); renderDiesel(); }
+function dslBorrarCamion(i) { var c = dslCfg(); if (!c.flota[i] || !confirm('¿Quitar ' + c.flota[i][0] + ' de la lista?')) return; c.flota.splice(i, 1); dslGuardar('dsl_cfg'); renderDiesel(); }
+function dslAddPiloto() { dslPilotoNuevo($('pi_n').value); $('pi_n').value = ''; renderDiesel(); }
+function dslBorrarPiloto(i) { var c = dslCfg(); if (!confirm('¿Quitar a ' + c.pilotos[i] + ' de las sugerencias?')) return; c.pilotos.splice(i, 1); dslGuardar('dsl_cfg'); renderDiesel(); }
+function dslAddGas() { var n = $('gs_n').value.trim().toUpperCase(); if (!n) return; var c = dslCfg(); if (c.gas.indexOf(n) < 0) { c.gas.push(n); dslGuardar('dsl_cfg'); } $('gs_n').value = ''; renderDiesel(); }
+function dslBorrarGas(i) { var c = dslCfg(); if (c.gas.length < 2) { alert('Debe quedar al menos una gasolinera.'); return; } if (!confirm('¿Quitar ' + c.gas[i] + ' de la lista? (Sus registros no se borran.)')) return; c.gas.splice(i, 1); dslGuardar('dsl_cfg'); renderDiesel(); }
+function dslSetAlerta(v) { dslCfg().alerta = parseFloat(v) || 0; dslGuardar('dsl_cfg'); renderDiesel(); }
+function dslRangoMes() { var h = hoyISO(); $('dt_d').value = h.slice(0, 8) + '01'; $('dt_h').value = h; renderDiesel(); }
+
+/* --- render --- */
+function dslMeses(movs) {
+  var s = {}; movs.forEach(function (m) { s[m.f.slice(0, 7)] = 1; }); s[hoyISO().slice(0, 7)] = 1;
+  return Object.keys(s).sort().reverse();
+}
+function dslOpcMes(id, movs, sel) {
+  var h = '<option value="">Todos los meses</option>' + dslMeses(movs).map(function (k) { return '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + MESES[Number(k.slice(5)) - 1] + ' ' + k.slice(0, 4) + '</option>'; }).join('');
+  if ($(id).innerHTML !== h) $(id).innerHTML = h;
+}
+function dslFechaCorta(f) { var p = f.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function renderDiesel() {
+  if (!$('v-diesel')) return;
+  var c = dslCfg(), mp = dslMovs('p'), mr = dslMovs('r'), sal = dslSaldos(mp), bajo = sal.t < c.alerta;
+  // pestaña con aviso
+  var nb = document.querySelector('#nav button[data-v="diesel"]');
+  if (nb) { nb.textContent = bajo ? 'Diesel ⚠' : 'Diesel'; nb.classList.toggle('low', bajo); }
+  // listas
+  var dl = function (id, arr) { var h = arr.map(function (x) { return '<option value="' + esc(x) + '">'; }).join(''); if ($(id).innerHTML !== h) $(id).innerHTML = h; };
+  dl('dl_placas', c.flota.map(function (x) { return x[0]; }));
+  dl('dl_pilotos', c.pilotos);
+  var rs = {}; mp.concat(mr).forEach(function (m) { if (m.r) rs[m.r] = 1; }); dl('dl_rutas', Object.keys(rs).sort());
+  ['dp_f', 'de_f', 'dr_f', 'dj_f', 'dg_f'].forEach(function (i) { if (!$(i).value) $(i).value = hoyISO(); });
+  if (DSL.sub === 'predio') dslRenderPredio(mp, sal, bajo, c);
+  else if (DSL.sub === 'ruta') dslRenderRuta(mr, c);
+  else if (DSL.sub === 'resumen') dslRenderResumen(mp, mr);
+  else dslRenderFlota(c);
+}
+function dslRenderPredio(mp, sal, bajo, c) {
+  var h = '', sol = c.sol;
+  if (bajo && !sol) h = '<div class="dban rojo">⚠️ Quedan ' + dslG(sal.t) + ' galones en el tanque (alerta: menos de ' + dslG(c.alerta) + '). Ya es necesario solicitar más diesel al predio. <button class="b bad" onclick="dslSolicitar()">Marcar como solicitado</button></div>';
+  else if (sol) h = '<div class="dban ambar">⏳ Diesel solicitado el ' + dslFechaCorta(sol.f) + (sol.g ? ' (' + dslG(sol.g) + ' galones)' : '') + '. Cuando lo despachen, registra la entrada con su comprobante. <button class="b sec" onclick="dslCancelarSol()">Cancelar solicitud</button></div>';
+  else h = '<div class="dban verde">✅ Tanque principal con ' + dslG(sal.t) + ' galones. Alerta cuando baje de ' + dslG(c.alerta) + '.</div>';
+  $('dp_ban').innerHTML = h;
+  var hoy = hoyISO(), mes = hoy.slice(0, 7), dh = [0, 0], dm = [0, 0];
+  mp.forEach(function (m) { if (m.t !== 'des') return; var i = m.a === 'b' ? 1 : 0; if (m.f === hoy) dh[i] += m.g; if (m.f.slice(0, 7) === mes) dm[i] += m.g; });
+  var k = function (v, t, cl) { return '<div class="kpi ' + (cl || '') + '"><b>' + v + '</b><span>' + t + '</span></div>'; };
+  $('dp_kpi').innerHTML = k(dslG(sal.t), 'TANQUE disponible (gal)', bajo ? 'alert' : '') + k(dslG(sal.b), 'BIDONES disponibles (gal)', sal.b < 0 ? 'alert' : '') + k(dslG(sal.t + sal.b), 'TOTAL predio (gal)') + k(dslG(dh[0]) + ' / ' + dslG(dh[1]), 'despachado hoy tanque / bidones') + k(dslG(dm[0]) + ' / ' + dslG(dm[1]), 'este mes tanque / bidones');
+  $('al_g') && ($('al_g').value = c.alerta);
+  // saldos corridos
+  var t = 0, b = 0, filas = [];
+  mp.forEach(function (m) {
+    var g = Number(m.g) || 0, dt = 0, db = 0;
+    if (m.t === 'ent') dt = g; else if (m.t === 'des') { if (m.a === 'b') db = -g; else dt = -g; } else if (m.t === 'reb') { dt = -g; db = g; } else if (m.t === 'aj') { if (m.a === 'b') db = g; else dt = g; }
+    t = dslR(t + dt); b = dslR(b + db); filas.push({ m: m, dt: dt, db: db, t: t, b: b });
+  });
+  dslOpcMes('dp_mes', mp, DSL.mesP);
+  var vis = filas.filter(function (x) { return !DSL.mesP || x.m.f.slice(0, 7) === DSL.mesP; });
+  var rows = '', dia = null, st = 0, sb = 0, nrow = 0;
+  var cierra = function () { if (dia !== null) rows += '<tr class="dia"><td colspan="6">Total del ' + dslFechaCorta(dia) + '</td><td class="r">' + dslG(st) + '</td><td class="r">' + dslG(sb) + '</td><td colspan="3"></td></tr>'; };
+  var orden = vis.slice().sort(function (a, b) { return a.m.f < b.m.f ? 1 : a.m.f > b.m.f ? -1 : (a.m.id < b.m.id ? 1 : -1); });
+  orden.forEach(function (x) {
+    if (x.m.f !== dia) { cierra(); dia = x.m.f; st = 0; sb = 0; }
+    st = dslR(st + x.dt); sb = dslR(sb + x.db);
+    var m = x.m, tipo = { ent: '📥 Entrada', des: '⛽ Despacho', reb: '🛢️ Rellenado bidones', aj: '⚖️ Ajuste' }[m.t] || m.t;
+    var clip = m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '';
+    var cell = function (v) { return '<td class="r' + (v < 0 ? ' neg' : '') + '">' + (v ? (v > 0 ? '+' : '') + dslG(v) : '') + '</td>'; };
+    rows += '<tr class="' + (m.t === 'ent' ? 'ent' : '') + '"><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + tipo + clip + '</td><td>' + esc(m.pl || '') + '</td><td>' + esc(m.pi || '') + '</td><td>' + esc(m.r || m.n || '') + '</td>' + cell(x.dt) + cell(x.db) + '<td class="r">' + dslG(x.t) + '</td><td class="r">' + dslG(x.b) + '</td><td><button class="b sec" onclick="dslDel(\'p\',\'' + m.id + '\')">🗑</button></td></tr>';
+    nrow++;
+  });
+  cierra();
+  $('dp_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Movimiento</th><th>Placa</th><th>Piloto</th><th>Ruta / nota</th><th class="r">Tanque</th><th class="r">Bidones</th><th class="r">Saldo tanque</th><th class="r">Saldo bidones</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin movimientos.</td></tr>');
+  var pl = $('dp_pl').value, ult = pl ? dslCap(pl) : null;
+  $('dp_info').textContent = ult ? 'Capacidad de ' + ult[0] + ': ' + ult[2] + ' galones.' + (!$('dp_pi').value && dslUltPiloto(pl) ? ' Último piloto: ' + dslUltPiloto(pl) + '.' : '') : 'Elige la placa para ver su capacidad.';
+}
+function dslRenderRuta(mr, c) {
+  var h = '<option value="">Elige...</option>' + c.gas.map(function (g) { return '<option>' + esc(g) + '</option>'; }).join('');
+  var cur = $('dg_gs').value; if ($('dg_gs')._h !== h) { $('dg_gs').innerHTML = h; $('dg_gs')._h = h; if (cur) $('dg_gs').value = cur; }
+  var todas = {}; c.gas.forEach(function (g) { todas[g] = 1; }); mr.forEach(function (m) { todas[m.gs] = 1; });
+  var fh = '<option value="">Todas las gasolineras</option>' + Object.keys(todas).map(function (g) { return '<option' + (g === DSL.gsF ? ' selected' : '') + '>' + esc(g) + '</option>'; }).join('');
+  if ($('dg_fgs').innerHTML !== fh) $('dg_fgs').innerHTML = fh;
+  dslOpcMes('dg_mes', mr, DSL.mesR);
+  var vis = mr.filter(function (m) { return (!DSL.gsF || m.gs === DSL.gsF) && (!DSL.mesR || m.f.slice(0, 7) === DSL.mesR); });
+  var tg = 0, tq = 0, porGs = {};
+  vis.forEach(function (m) { tg += m.g; tq += m.q || 0; var o = porGs[m.gs] = porGs[m.gs] || [0, 0]; o[0] += m.g; o[1] += m.q || 0; });
+  var k = function (v, t) { return '<div class="kpi"><b>' + v + '</b><span>' + t + '</span></div>'; };
+  $('dr2_kpi').innerHTML = k(dslG(tg), 'galones (vista actual)') + k(q2(tq), 'total pagado') + k(tg ? q2(tq / tg) : 'Q 0.00', 'precio promedio / gal') + Object.keys(porGs).map(function (g) { return k(dslG(porGs[g][0]) + ' · ' + q2(porGs[g][1]), g); }).join('');
+  var orden = vis.slice().sort(function (a, b) { return a.f < b.f ? 1 : a.f > b.f ? -1 : (a.id < b.id ? 1 : -1); }), rows = '', dia = null, sg = 0, sq = 0;
+  var cierra = function () { if (dia !== null) rows += '<tr class="dia"><td colspan="6">Total del ' + dslFechaCorta(dia) + '</td><td class="r">' + dslG(sg) + '</td><td class="r">' + q2(sq) + '</td><td colspan="3"></td></tr>'; };
+  orden.forEach(function (m) {
+    if (m.f !== dia) { cierra(); dia = m.f; sg = 0; sq = 0; }
+    sg += m.g; sq += m.q || 0;
+    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + '</td><td><button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
+  });
+  cierra();
+  $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>Factura</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
+  var pl = $('dg_pl').value, cam = pl ? dslCap(pl) : null, g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value);
+  $('dg_info').textContent = (cam ? 'Capacidad de ' + cam[0] + ': ' + cam[2] + ' galones. ' : '') + (g > 0 && q > 0 ? 'Precio: ' + q2(q / g) + ' por galón.' : '');
+}
+function dslClavePeriodo(f, modo) {
+  if (modo === 'd') return f;
+  if (modo === 'm') return f.slice(0, 7);
+  var l = lunesDe(f); return l.getFullYear() + '-' + d2(l.getMonth() + 1) + '-' + d2(l.getDate());
+}
+function dslEtiqueta(k, modo) {
+  if (modo === 'd') return dslFechaCorta(k);
+  if (modo === 'm') return MESES[Number(k.slice(5)) - 1] + ' ' + k.slice(0, 4);
+  var l = fISO(k), f = new Date(l.getTime()); f.setDate(f.getDate() + 6);
+  return 'Sem ' + semISO(l) + ' (' + d2(l.getDate()) + '/' + d2(l.getMonth() + 1) + ' - ' + d2(f.getDate()) + '/' + d2(f.getMonth() + 1) + ')';
+}
+function dslRenderResumen(mp, mr) {
+  if (!$('dt_d').value) { var h0 = hoyISO(); $('dt_d').value = h0.slice(0, 8) + '01'; $('dt_h').value = h0; }
+  var d = $('dt_d').value, h = $('dt_h').value, modo = $('dt_g').value || 'd';
+  var P = mp.filter(function (m) { return m.t === 'des' && m.f >= d && m.f <= h; }), R = mr.filter(function (m) { return m.f >= d && m.f <= h; });
+  var per = {}, gs = {}, cam = {}, pil = {};
+  var ensure = function (o, k) { return o[k] = o[k] || { t: 0, b: 0, r: 0, q: 0 }; };
+  P.forEach(function (m) { var o = ensure(per, dslClavePeriodo(m.f, modo)); o[m.a === 'b' ? 'b' : 't'] += m.g; var c = ensure(cam, m.pl); c[m.a === 'b' ? 'b' : 't'] += m.g; var p = ensure(pil, m.pi); p[m.a === 'b' ? 'b' : 't'] += m.g; });
+  R.forEach(function (m) { var o = ensure(per, dslClavePeriodo(m.f, modo)); o.r += m.g; o.q += m.q || 0; var g = ensure(gs, m.gs); g.r += m.g; g.q += m.q || 0; var c = ensure(cam, m.pl); c.r += m.g; c.q += m.q || 0; var p = ensure(pil, m.pi); p.r += m.g; p.q += m.q || 0; });
+  var T = { t: 0, b: 0, r: 0, q: 0 }; Object.keys(per).forEach(function (k) { ['t', 'b', 'r', 'q'].forEach(function (x) { T[x] += per[k][x]; }); });
+  var tab = function (cab, filas) { return '<div class="tw" style="margin-bottom:12px"><table><tr>' + cab.map(function (c, i) { return '<th' + (i ? ' class="r"' : '') + '>' + c + '</th>'; }).join('') + '</tr>' + filas + '</table></div>'; };
+  var fila = function (n, o) { return '<tr><td>' + esc(n) + '</td><td class="r">' + dslG(o.t) + '</td><td class="r">' + dslG(o.b) + '</td><td class="r">' + dslG(o.r) + '</td><td class="r"><b>' + dslG(o.t + o.b + o.r) + '</b></td><td class="r">' + (o.q ? q2(o.q) : '') + '</td></tr>'; };
+  var cab = ['', 'Predio tanque', 'Predio bidones', 'Gasolineras', 'Total galones', 'Pagado en gasolineras'];
+  var orden = function (o) { return Object.keys(o).sort(function (a, b) { return (o[b].t + o[b].b + o[b].r) - (o[a].t + o[a].b + o[a].r); }); };
+  var out = '<div class="cres"><div><span>Predio tanque</span><b>' + dslG(T.t) + ' gal</b></div><div><span>Predio bidones</span><b>' + dslG(T.b) + ' gal</b></div><div><span>Gasolineras</span><b>' + dslG(T.r) + ' gal</b></div><div class="pos"><span>Total galones</span><b>' + dslG(T.t + T.b + T.r) + ' gal</b></div><div><span>Pagado en gasolineras</span><b>' + q2(T.q) + '</b></div></div>';
+  out += '<h2 style="margin:14px 0 6px">Por ' + (modo === 'd' ? 'día' : modo === 's' ? 'semana' : 'mes') + '</h2>' + tab(['Período'].concat(cab.slice(1)), Object.keys(per).sort().reverse().map(function (k) { return fila(dslEtiqueta(k, modo), per[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos en ese rango.</td></tr>');
+  out += '<h2 style="margin:14px 0 6px">Por gasolinera</h2>' + tab(['Gasolinera'].concat(cab.slice(1)), orden(gs).map(function (k) { return fila(k, gs[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos.</td></tr>');
+  out += '<h2 style="margin:14px 0 6px">Por camión</h2>' + tab(['Placa'].concat(cab.slice(1)), orden(cam).map(function (k) { return fila(k, cam[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos.</td></tr>');
+  out += '<h2 style="margin:14px 0 6px">Por piloto</h2>' + tab(['Piloto'].concat(cab.slice(1)), orden(pil).map(function (k) { return fila(k, pil[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos.</td></tr>');
+  $('dt_out').innerHTML = out;
+}
+function dslRenderFlota(c) {
+  var fl = c.flota.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return a.x[0].localeCompare(b.x[0]); });
+  $('fl_tab').innerHTML = '<tr><th>Placa</th><th>Marca</th><th class="r">Capacidad (gal)</th><th>Estado</th><th></th></tr>' + fl.map(function (o) {
+    var x = o.x, i = o.i;
+    return '<tr><td><input value="' + esc(x[0]) + '" style="width:110px" onchange="dslEditCamion(' + i + ',0,this.value)"></td><td><input value="' + esc(x[1] || '') + '" style="width:120px" onchange="dslEditCamion(' + i + ',1,this.value)"></td><td class="r"><input type="number" value="' + (x[2] || 0) + '" style="width:80px" onchange="dslEditCamion(' + i + ',2,this.value)"></td><td><select onchange="dslEditCamion(' + i + ',3,this.value)"><option' + (/^activo/i.test(x[3] || 'ACTIVO') ? ' selected' : '') + '>ACTIVO</option><option' + (/^activo/i.test(x[3] || 'ACTIVO') ? '' : ' selected') + '>INACTIVO</option></select></td><td><button class="b sec" onclick="dslBorrarCamion(' + i + ')">🗑</button></td></tr>';
+  }).join('');
+  $('pi_list').innerHTML = c.pilotos.map(function (p, i) { return '<span class="dchip">' + esc(p) + '<button onclick="dslBorrarPiloto(' + i + ')" title="Quitar">✕</button></span>'; }).join('') || '<span class="mut">Aún no hay pilotos guardados.</span>';
+  $('gs_list').innerHTML = c.gas.map(function (g, i) { return '<span class="dchip">' + esc(g) + '<button onclick="dslBorrarGas(' + i + ')" title="Quitar">✕</button></span>'; }).join('');
+  $('al_g').value = c.alerta;
+}
+document.addEventListener('input', function (e) {
+  if (!e.target || !e.target.id) return;
+  if (e.target.id === 'dp_pl' || e.target.id === 'dp_g') {
+    var pl = $('dp_pl').value, cam = pl ? dslCap(pl) : null;
+    if (e.target.id === 'dp_pl' && cam && !$('dp_pi').value) { var u = dslUltPiloto(pl); if (u) $('dp_pi').value = u; }
+    $('dp_info').textContent = cam ? 'Capacidad de ' + cam[0] + ': ' + cam[2] + ' galones.' : 'Elige la placa para ver su capacidad.';
+  }
+  if (e.target.id === 'dg_pl' || e.target.id === 'dg_g' || e.target.id === 'dg_q') {
+    var p2 = $('dg_pl').value, c2 = p2 ? dslCap(p2) : null, g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value);
+    if (e.target.id === 'dg_pl' && c2 && !$('dg_pi').value) { var u2 = dslUltPiloto(p2); if (u2) $('dg_pi').value = u2; }
+    $('dg_info').textContent = (c2 ? 'Capacidad de ' + c2[0] + ': ' + c2[2] + ' galones. ' : '') + (g > 0 && q > 0 ? 'Precio: ' + q2(q / g) + ' por galón.' : '');
+  }
+});
+document.getElementById('ds-nav').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) dslSub(b.getAttribute('data-ds')); });
+
 var arrastrando = null;
 function enlazarDnD() {
   document.querySelectorAll('.rdrag').forEach(function (h) {
@@ -1151,7 +1643,7 @@ function renderConfig() {
 function renderTodo() {
   var act = document.activeElement;
   var enDeptos = act && act.closest && act.closest('#tdep');
-  renderRutas(); renderPedidos(); renderDicc(); renderConfig(); renderCostos(); renderTarifario(); renderRent();
+  renderRutas(); renderPedidos(); renderDicc(); renderConfig(); renderCostos(); renderTarifario(); renderRent(); renderDiesel();
   if (!enDeptos) renderDeptos();
   $('dp').innerHTML = '<option value="">Departamento...</option>' + deptos().map(function (d) { return '<option>' + esc(d) + '</option>'; }).join('');
 }
@@ -1161,7 +1653,7 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
-document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); });
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); });
 $('lk').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
 arranque();
 </script>
