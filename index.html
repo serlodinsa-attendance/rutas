@@ -307,6 +307,9 @@ nav button.low{color:#fca5a5}
         <label class="mut">Desde<br><input type="date" id="dt_d" onchange="renderDiesel()"></label>
         <label class="mut">Hasta<br><input type="date" id="dt_h" onchange="renderDiesel()"></label>
         <label class="mut">Agrupar por<br><select id="dt_g" onchange="renderDiesel()"><option value="d">Día</option><option value="s">Semana</option><option value="m">Mes</option></select></label>
+        <label class="mut">Buscar placa o piloto<br><input id="dt_q" type="search" placeholder="Ej. C-958BPT o Edwin" oninput="renderDiesel()" style="width:210px" autocomplete="off"></label>
+        <label class="mut">Gráficas por<br><select id="dt_e" onchange="renderDiesel()"><option value="p">Placa</option><option value="n">Piloto</option></select></label>
+        <label class="mut">Ver<br><select id="dt_m" onchange="renderDiesel()"><option value="t">Total galones</option><option value="r">Solo en ruta (gasolineras)</option><option value="p">Solo del predio</option></select></label>
         <button class="b sec" onclick="dslRangoMes()" style="align-self:flex-end">Este mes</button>
       </div>
       <div id="dt_out"></div>
@@ -1461,10 +1464,42 @@ function dslEtiqueta(k, modo) {
   var l = fISO(k), f = new Date(l.getTime()); f.setDate(f.getDate() + 6);
   return 'Sem ' + semISO(l) + ' (' + d2(l.getDate()) + '/' + d2(l.getMonth() + 1) + ' - ' + d2(f.getDate()) + '/' + d2(f.getMonth() + 1) + ')';
 }
+function dslGraficas(P, R, per, modo) {
+  var ent = $('dt_e').value || 'p', met = $('dt_m').value || 't', q = ($('dt_q').value || '').trim();
+  var col = { t: '#2563eb', b: '#f59e0b', r: '#16a34a' }, nom = { t: 'Tanque del predio', b: 'Bidones del predio', r: 'Gasolineras (en ruta)' };
+  var use = met === 't' ? ['t', 'b', 'r'] : met === 'r' ? ['r'] : ['t', 'b'];
+  var tot = function (o) { return use.reduce(function (s, x) { return s + (o[x] || 0); }, 0); };
+  var leg = '<p class="mut" style="margin:2px 0 8px">' + use.map(function (x) { return '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px"><i style="width:10px;height:10px;border-radius:2px;background:' + col[x] + '"></i>' + nom[x] + '</span>'; }).join('') + (q ? ' · Filtrado por: <b>' + esc(q) + '</b>' : '') + '</p>';
+  var rk = {};
+  var add = function (m, k) { var key = ent === 'p' ? m.pl : m.pi; if (!key) return; var o = rk[key] = rk[key] || { t: 0, b: 0, r: 0 }; o[k] += Number(m.g) || 0; };
+  P.forEach(function (m) { add(m, m.a === 'b' ? 'b' : 't'); });
+  R.forEach(function (m) { add(m, 'r'); });
+  var keys = Object.keys(rk).filter(function (k) { return tot(rk[k]) > 0; }).sort(function (a, b) { return tot(rk[b]) - tot(rk[a]); });
+  var top = keys.slice(0, 15), mx = top.length ? tot(rk[top[0]]) : 1;
+  var h = '<h2 style="margin:14px 0 4px">📊 Quién consume más (' + (ent === 'p' ? 'por placa' : 'por piloto') + ')</h2>' + leg;
+  h += top.map(function (k, i) {
+    var o = rk[k];
+    var segs = use.map(function (x) { return o[x] > 0 ? '<div title="' + nom[x] + ': ' + dslG(o[x]) + ' gal" style="width:' + (o[x] / mx * 100) + '%;background:' + col[x] + ';height:100%"></div>' : ''; }).join('');
+    return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><div style="width:150px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(k) + '">' + (i + 1) + '. ' + esc(k) + '</div><div style="flex:1;display:flex;height:20px;background:#f1f5f9;border-radius:4px;overflow:hidden">' + segs + '</div><b style="width:78px;text-align:right;font-size:13px">' + dslG(tot(o)) + '</b></div>';
+  }).join('') || '<p class="mut">Sin datos en este rango.</p>';
+  if (keys.length > 15) h += '<p class="mut">Se muestran los 15 con más consumo de ' + keys.length + '.</p>';
+  var pk = Object.keys(per).sort(), pm = 0;
+  pk.forEach(function (k) { pm = Math.max(pm, tot(per[k])); });
+  h += '<h2 style="margin:18px 0 4px">📈 Consumo por ' + (modo === 'd' ? 'día' : modo === 's' ? 'semana' : 'mes') + (q ? ' de "' + esc(q) + '"' : ' (todos)') + '</h2>' + leg;
+  h += '<div style="display:flex;gap:8px;align-items:flex-end;overflow-x:auto;padding:6px 0 4px;min-height:60px">' + (pk.map(function (k) {
+    var o = per[k], t = tot(o), H = 150;
+    var segs = use.map(function (x) { return o[x] > 0 ? '<div title="' + nom[x] + ': ' + dslG(o[x]) + ' gal" style="height:' + Math.max(1, o[x] / pm * H) + 'px;background:' + col[x] + '"></div>' : ''; }).join('');
+    return '<div style="flex:0 0 auto;min-width:50px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><span style="font-size:11px;font-weight:700">' + dslG(t) + '</span><div style="width:32px;display:flex;flex-direction:column-reverse;margin:2px 0">' + segs + '</div><span style="font-size:11px;white-space:nowrap" class="mut">' + dslEtiqueta(k, modo) + '</span></div>';
+  }).join('') || '<p class="mut">Sin datos en este rango.</p>') + '</div>';
+  return '<div style="margin-top:6px">' + h + '</div>';
+}
 function dslRenderResumen(mp, mr) {
   if (!$('dt_d').value) { var h0 = hoyISO(); $('dt_d').value = h0.slice(0, 8) + '01'; $('dt_h').value = h0; }
   var d = $('dt_d').value, h = $('dt_h').value, modo = $('dt_g').value || 'd';
-  var P = mp.filter(function (m) { return m.t === 'des' && m.f >= d && m.f <= h; }), R = mr.filter(function (m) { return m.f >= d && m.f <= h; });
+  var nq = function (x) { return String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+  var q = nq($('dt_q').value.trim());
+  var coin = function (m) { return !q || nq(m.pl).indexOf(q) >= 0 || nq(m.pi).indexOf(q) >= 0; };
+  var P = mp.filter(function (m) { return m.t === 'des' && m.f >= d && m.f <= h && coin(m); }), R = mr.filter(function (m) { return m.f >= d && m.f <= h && coin(m); });
   var per = {}, gs = {}, cam = {}, pil = {};
   var ensure = function (o, k) { return o[k] = o[k] || { t: 0, b: 0, r: 0, q: 0 }; };
   P.forEach(function (m) { var o = ensure(per, dslClavePeriodo(m.f, modo)); o[m.a === 'b' ? 'b' : 't'] += m.g; var c = ensure(cam, m.pl); c[m.a === 'b' ? 'b' : 't'] += m.g; var p = ensure(pil, m.pi); p[m.a === 'b' ? 'b' : 't'] += m.g; });
@@ -1479,7 +1514,7 @@ function dslRenderResumen(mp, mr) {
   out += '<h2 style="margin:14px 0 6px">Por gasolinera</h2>' + tab(['Gasolinera', 'Galones', 'Pagado', 'Precio promedio / gal'], orden(gs).map(function (k) { var o = gs[k]; return '<tr><td>' + esc(k) + '</td><td class="r"><b>' + dslG(o.r) + '</b></td><td class="r">' + (o.q ? q2(o.q) : '') + '</td><td class="r">' + (o.q && o.r ? q2(o.q / o.r) : '') + '</td></tr>'; }).join('') || '<tr><td colspan="4" class="mut">Sin datos.</td></tr>');
   out += '<h2 style="margin:14px 0 6px">Por camión</h2>' + tab(['Placa'].concat(cab.slice(1)), orden(cam).map(function (k) { return fila(k, cam[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos.</td></tr>');
   out += '<h2 style="margin:14px 0 6px">Por piloto</h2>' + tab(['Piloto'].concat(cab.slice(1)), orden(pil).map(function (k) { return fila(k, pil[k]); }).join('') || '<tr><td colspan="6" class="mut">Sin datos.</td></tr>');
-  $('dt_out').innerHTML = out;
+  $('dt_out').innerHTML = dslGraficas(P, R, per, modo) + out;
 }
 function dslRenderFlota(c) {
   var fl = c.flota.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return a.x[0].localeCompare(b.x[0]); });
