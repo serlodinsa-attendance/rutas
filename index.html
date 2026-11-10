@@ -261,8 +261,12 @@ nav button.low{color:#fca5a5}
         <p class="mut" style="margin:6px 0 0">Si el saldo real no coincide con el del sistema, se registra la diferencia como ajuste.</p>
       </div>
     </div>
+    <div class="card" id="dp_ent_card">
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">📥 Entradas de diesel al tanque (recargas)</h2></div>
+      <div class="tw"><table id="dp_ent"></table></div>
+    </div>
     <div class="card">
-      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Movimientos del predio</h2>
+      <div class="row" style="margin-bottom:8px"><h2 style="margin:0">Despachos y movimientos del predio</h2>
         <select id="dp_mes" onchange="DSL.mesP=this.value;renderDiesel()"></select>
         <span class="mut">Cada día muestra su total, como en tu Excel.</span></div>
       <div class="tw"><table id="dp_tab"></table></div>
@@ -1401,6 +1405,7 @@ function dslRenderPredio(mp, sal, bajo, c) {
   var cierra = function () { if (dia !== null) rows += '<tr class="dia"><td colspan="6">Total del ' + dslFechaCorta(dia) + '</td><td class="r">' + dslG(st) + '</td><td class="r">' + dslG(sb) + '</td><td colspan="3"></td></tr>'; };
   var orden = vis.slice().sort(function (a, b) { return a.m.f < b.m.f ? 1 : a.m.f > b.m.f ? -1 : (a.m.id < b.m.id ? 1 : -1); });
   orden.forEach(function (x) {
+    if (x.m.t === 'ent') return;
     if (x.m.f !== dia) { cierra(); dia = x.m.f; st = 0; sb = 0; }
     st = dslR(st + x.dt); sb = dslR(sb + x.db);
     var m = x.m, tipo = { ent: '📥 Entrada', des: '⛽ Despacho', reb: '🛢️ Rellenado bidones', aj: '⚖️ Ajuste' }[m.t] || m.t;
@@ -1410,6 +1415,13 @@ function dslRenderPredio(mp, sal, bajo, c) {
     nrow++;
   });
   cierra();
+  var ents = vis.filter(function (x) { return x.m.t === 'ent'; }).sort(function (a, b) { return a.m.f < b.m.f ? 1 : a.m.f > b.m.f ? -1 : (a.m.id < b.m.id ? 1 : -1); }), te = 0;
+  var erows = ents.map(function (x) {
+    var m = x.m; te += m.g;
+    var clip = m.img && S.cfg['dsl_img_' + m.img] ? '<img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '<span class="mut">sin foto</span>';
+    return '<tr class="ent"><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.n || '') + '</td><td class="r"><b>+' + dslG(m.g) + '</b></td><td>' + clip + '</td><td><button class="b sec" onclick="dslEditar(\'p\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'p\',\'' + m.id + '\')">🗑</button></td></tr>';
+  }).join('');
+  $('dp_ent').innerHTML = '<tr><th>Fecha</th><th>Nota / proveedor</th><th class="r">Galones</th><th>Comprobante</th><th></th></tr>' + (erows ? erows + '<tr class="dia"><td colspan="2">Total entradas</td><td class="r">+' + dslG(te) + '</td><td colspan="2"></td></tr>' : '<tr><td colspan="5" class="mut">Sin entradas.</td></tr>');
   $('dp_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Movimiento</th><th>Placa</th><th>Piloto</th><th>Ruta / nota</th><th class="r">Tanque</th><th class="r">Bidones</th><th class="r">Saldo tanque</th><th class="r">Saldo bidones</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin movimientos.</td></tr>');
   var pl = $('dp_pl').value, ult = pl ? dslCap(pl) : null;
   $('dp_info').textContent = ult ? 'Capacidad de ' + ult[0] + ': ' + ult[2] + ' galones.' + (!$('dp_pi').value && dslUltPiloto(pl) ? ' Último piloto: ' + dslUltPiloto(pl) + '.' : '') : 'Elige la placa para ver su capacidad.';
