@@ -267,6 +267,15 @@ function indexarDicc() {
   S.dmap = {};
   S.dicc.forEach(function (r, i) { var k = norm(r[0]); if (k && !(k in S.dmap)) S.dmap[k] = i; });
 }
+function fusionarPedidos(arr) {
+  var f = {}, lista = [], dup = [];
+  arr.forEach(function (n) {
+    var k = norm(n.destino), x = f[k];
+    if (x) { x.m += n.m; x.t += n.t; x.q += n.q; x.k += n.k; if (n.com && x.com !== n.com) x.com = x.com ? x.com + ' | ' + n.com : n.com; dup.push(n.destino); }
+    else { f[k] = n; lista.push(n); }
+  });
+  return { lista: lista, dup: dup };
+}
 function cargar() {
   setEstado('Cargando...');
   return api('cargar').then(function (r) {
@@ -276,8 +285,9 @@ function cargar() {
       return x;
     }).sort(function (a, b) { return a.n - b.n; });
     indexarDicc();
+    var fu = fusionarPedidos(S.pedidos); S.pedidos = fu.lista;
     limpiarObsoletos();
-    var cambio = autoColocar();
+    var cambio = autoColocar() || fu.dup.length > 0;
     renderTodo();
     setEstado('Listo', '#86efac');
     if (cambio) guardarTodo();
@@ -323,7 +333,8 @@ function rutaDe(destino) {
 }
 function pedidoDe(destino) { var k = norm(destino); for (var i = 0; i < S.pedidos.length; i++) if (norm(S.pedidos[i].destino) === k) return S.pedidos[i]; return null; }
 function limpiarObsoletos() {
-  S.rutas.forEach(function (r) { r.destinos = r.destinos.filter(function (d) { return pedidoDe(d); }); });
+  var vistos = {};
+  S.rutas.forEach(function (r) { r.destinos = r.destinos.filter(function (d) { var k = norm(d); if (vistos[k] || !pedidoDe(d)) return false; vistos[k] = 1; return true; }); });
 }
 function sugerir(destino) {
   var depto = deptoDe(destino);
@@ -927,6 +938,7 @@ function cargarPegado() {
     nuevos.push({ destino: d, m: num(c[1]), t: num(c[2]), q: num(c[3]), k: num(c[4]), com: (c[5] || '').trim() });
   });
   if (!nuevos.length) { $('pmsg').textContent = 'No se encontraron pedidos.'; return; }
+  var fu0 = fusionarPedidos(nuevos); nuevos = fu0.lista; var dups = fu0.dup;
   var modo = document.querySelector('input[name=modo]:checked').value;
   if (modo === 'reemplazar') {
     if (S.pedidos.length && !confirm('Esto borra los ' + S.pedidos.length + ' pedidos anteriores y las rutas se arman de nuevo con los nuevos. ¿Continuar?')) return;
@@ -936,7 +948,7 @@ function cargarPegado() {
     nuevos.forEach(function (n) { var p = pedidoDe(n.destino); if (p) { p.m += n.m; p.t += n.t; p.q += n.q; p.k += n.k; if (n.com) p.com = n.com; } else S.pedidos.push(n); });
   }
   autoColocar();
-  $('paste').value = ''; $('pmsg').textContent = 'Listo: ' + nuevos.length + ' pedidos cargados' + (ign ? ' (' + ign + ' líneas ignoradas)' : '') + '.';
+  $('paste').value = ''; $('pmsg').textContent = 'Listo: ' + nuevos.length + ' pedidos cargados' + (ign ? ' (' + ign + ' líneas ignoradas)' : '') + (dups.length ? '. Destinos repetidos sumados: ' + dups.slice(0, 6).join(', ') + (dups.length > 6 ? '…' : '') : '') + '.';
   renderTodo(); guardarTodo();
 }
 function deptos() { return Object.keys(S.cfg.zonaRuta || {}); }
