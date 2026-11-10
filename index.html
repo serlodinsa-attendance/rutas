@@ -283,6 +283,7 @@ nav button.low{color:#fca5a5}
         <label class="mut">Galones<br><input type="number" step="any" min="0" id="dg_g" style="width:90px"></label>
         <label class="mut">Total (Q)<br><input type="number" step="any" min="0" id="dg_q" style="width:110px"></label>
         <label class="mut">No. factura<br><input id="dg_fac" style="width:120px"></label>
+        <label class="mut">Comprobante / factura (foto)<br><input type="file" accept="image/*" id="dg_img" style="max-width:230px"></label>
         <button class="b ok" onclick="dslRuta()" style="align-self:flex-end">Guardar</button>
       </div>
       <p class="mut" id="dg_info" style="margin:6px 0 0"></p>
@@ -1320,10 +1321,17 @@ function dslRuta() {
   var cam = dslCap(pl);
   if (!cam && !confirm('La placa ' + pl + ' no está en la lista de camiones. ¿Guardar de todos modos?')) return;
   if (cam && cam[2] && g > Number(cam[2]) && !confirm(pl + ' tiene capacidad de ' + cam[2] + ' galones y registras ' + g + '. ¿Continuar?')) return;
-  dslAdd('r', { f: f, h: $('dg_h').value || '', gs: gs, pl: pl, pi: pi, r: r, g: dslR(g), q: dslR(q), fac: fac });
-  dslPilotoNuevo(pi);
-  ['dg_g', 'dg_q', 'dg_fac', 'dg_pl', 'dg_pi', 'dg_r', 'dg_h'].forEach(function (i) { $(i).value = ''; });
-  renderDiesel();
+  var file = $('dg_img').files && $('dg_img').files[0], h = $('dg_h').value || '';
+  var fin = function (img) {
+    var m = { f: f, h: h, gs: gs, pl: pl, pi: pi, r: r, g: dslR(g), q: dslR(q), fac: fac };
+    if (img) { m.img = dslId(); S.cfg['dsl_img_' + m.img] = img; dslSucio['dsl_img_' + m.img] = 1; }
+    dslAdd('r', m);
+    dslPilotoNuevo(pi);
+    ['dg_g', 'dg_q', 'dg_fac', 'dg_pl', 'dg_pi', 'dg_r', 'dg_h', 'dg_img'].forEach(function (i) { $(i).value = ''; });
+    $('dg_info').textContent = img ? '✅ Despacho guardado con comprobante.' : '✅ Despacho guardado.';
+    renderDiesel();
+  };
+  if (file) { $('dg_info').textContent = 'Procesando imagen...'; dslComprimir(file).then(fin).catch(function (e) { $('dg_info').textContent = ''; alert(e.message); }); } else fin(null);
 }
 
 /* --- flota / pilotos / gasolineras --- */
@@ -1423,7 +1431,7 @@ function dslRenderRuta(mr, c) {
   orden.forEach(function (m) {
     if (m.f !== dia) { cierra(); dia = m.f; sg = 0; sq = 0; }
     sg += m.g; sq += m.q || 0;
-    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
+    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + (m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
   });
   cierra();
   $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>Factura</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
