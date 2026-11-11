@@ -836,6 +836,26 @@ function descargarAsignacion() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   });
 }
+function excelColorearRutas(ws, grupos, total) {
+  var PAL = ['FFADB9CA', 'FFDBDBDB', 'FFFFFF00', 'FFE2EFDA', 'FFF8CBAD', 'FFBDD7EE', 'FFFFE699', 'FFC6E0B4', 'FFD9D2E9', 'FFF4B084'];
+  var pinta = function (rr, color, r1, r2) {
+    var row = ws.getRow(rr);
+    for (var cc = 1; cc <= 13; cc++) {
+      var c = row.getCell(cc);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+      c.border = { top: { style: rr === r1 ? 'medium' : 'thin' }, left: { style: 'thin' }, bottom: { style: rr === r2 ? 'medium' : 'thin' }, right: { style: 'thin' } };
+    }
+    [8, 9, 10].forEach(function (k) { row.getCell(k).font = { name: 'Calibri', size: 11, bold: true }; });
+  };
+  var ult = 1;
+  grupos.forEach(function (g, gi) {
+    var r1 = g.ini + 2, r2 = g.fin + 2;
+    for (var rr = r1; rr <= r2; rr++) pinta(rr, PAL[gi % PAL.length], r1, r2);
+    if (g.merge && r2 > r1) ws.mergeCells(r1, 7, r2, 7);
+    ult = r2;
+  });
+  for (var rr = ult + 1; rr <= total + 1; rr++) pinta(rr, 'FFF2F2F2', rr, rr);
+}
 function descargarExcel() {
   if (typeof ExcelJS === 'undefined') { alert('No cargó la librería de Excel. Revisa tu internet y recarga la página.'); return; }
   var sa = sinAsignar(), incluir = false;
@@ -846,9 +866,11 @@ function descargarExcel() {
     if (cod !== null && /^\d+$/.test(String(cod))) cod = Number(cod);
     return [cod, p.destino, p.m || null, p.t || null, p.q || null, p.k || null, [p.com, (r && primera) ? r.obs : ''].filter(Boolean).join(' | ') || null, r ? r.n : null, r ? (r.piloto || null) : null, r ? (r.placa || null) : null, null, null, null];
   }
+  var grupos = [];
   S.rutas.forEach(function (r) {
-    var prim = true;
-    r.destinos.forEach(function (dn) { var p = pedidoDe(dn); if (p) { filas.push(fila(p, r, prim)); prim = false; } });
+    var prim = true, ini = filas.length, hayCom = false;
+    r.destinos.forEach(function (dn) { var p = pedidoDe(dn); if (p) { if (p.com) hayCom = true; filas.push(fila(p, r, prim)); prim = false; } });
+    if (filas.length > ini) grupos.push({ ini: ini, fin: filas.length - 1, merge: !!r.obs && !hayCom });
   });
   if (incluir) sa.forEach(function (p) { filas.push(fila(p, null, false)); });
   if (!filas.length) { alert('No hay destinos en las rutas para descargar.'); return; }
@@ -869,6 +891,7 @@ function descargarExcel() {
       if (n === 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
     });
   });
+  excelColorearRutas(ws, grupos, filas.length);
   var f = new Date(), dd = ('0' + f.getDate()).slice(-2), mm = ('0' + (f.getMonth() + 1)).slice(-2);
   wb.xlsx.writeBuffer().then(function (buf) {
     var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
