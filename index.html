@@ -286,7 +286,7 @@ nav button.low{color:#fca5a5}
         <label class="mut">Ruta / lugar<br><input id="dg_r" list="dl_rutas" placeholder="Ej. Franja transversal" style="width:200px" autocomplete="off"></label>
         <label class="mut">Galones<br><input type="number" step="any" min="0" id="dg_g" style="width:90px"></label>
         <label class="mut">Total (Q)<br><input type="number" step="any" min="0" id="dg_q" style="width:110px"></label>
-        <label class="mut">No. factura<br><input id="dg_fac" style="width:120px"></label>
+        <label class="mut">No. vale<br><input id="dg_fac" style="width:120px"></label>
         <label class="mut">Comprobante / factura (foto)<br><input type="file" accept="image/*" id="dg_img" style="max-width:230px"></label>
         <button class="b ok" onclick="dslRuta()" style="align-self:flex-end">Guardar</button>
       </div>
@@ -1290,7 +1290,7 @@ function dslEditar(t, id) {
   } else {
     tit = 'Editar despacho en gasolinera';
     var gs = dslCfg().gas.slice(); if (gs.indexOf(m.gs) < 0) gs.push(m.gs);
-    h += F('Hora', 'h', m.h, 'time', 110) + S2('Gasolinera', 'gs', gs.map(function (x) { return [x, x]; }), m.gs) + F('Placa', 'pl', m.pl, 'text', 130) + F('Piloto', 'pi', m.pi) + F('Ruta / lugar', 'r', m.r, 'text', 200) + F('Galones', 'g', m.g, 'number', 90) + F('Total (Q)', 'q', m.q, 'number', 110) + F('No. factura', 'fac', m.fac, 'text', 120);
+    h += F('Hora', 'h', m.h, 'time', 110) + S2('Gasolinera', 'gs', gs.map(function (x) { return [x, x]; }), m.gs) + F('Placa', 'pl', m.pl, 'text', 130) + F('Piloto', 'pi', m.pi) + F('Ruta / lugar', 'r', m.r, 'text', 200) + F('Galones', 'g', m.g, 'number', 90) + F('Total (Q)', 'q', m.q, 'number', 110) + F('No. vale', 'fac', m.fac, 'text', 120);
   }
   var ov = document.createElement('div'); ov.id = 'dsl_ed';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:90;display:flex;align-items:center;justify-content:center;padding:14px';
@@ -1449,7 +1449,7 @@ function dslRenderRuta(mr, c) {
     rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + (m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
   });
   cierra();
-  $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>Factura</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
+  $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>No. vale</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
   var pl = $('dg_pl').value, cam = pl ? dslCap(pl) : null, g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value);
   $('dg_info').textContent = (cam ? 'Capacidad de ' + cam[0] + ': ' + cam[2] + ' galones. ' : '') + (g > 0 && q > 0 ? 'Precio: ' + q2(q / g) + ' por galón.' : '');
 }
