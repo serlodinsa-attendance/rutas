@@ -117,7 +117,7 @@ nav button.low{color:#fca5a5}
 <header>
   <h1>Panel de Control SERLODINSA</h1>
   <nav id="nav">
-    <button data-v="rutas" class="on">Rutas Hoy</button>
+    <button data-v="rutas" class="on">Rutas Diarias</button>
     <button data-v="pedidos">Pedidos</button>
     <button data-v="costos">Costos de Rutas</button>
     <button data-v="rent">Rentabilidad</button>
@@ -959,7 +959,7 @@ function renderCostos() {
     [['viaticos', 'Viáticos Q'], ['galones', 'Galones'], ['precio', 'Precio galón Q'], ['piloto', 'Salario piloto Q'], ['aux1', 'Salario auxiliar 1 Q'], ['aux2', 'Salario auxiliar 2 Q']].map(function (x) {
       return '<label class="mut">' + x[1] + '<br><input type="number" step="any" style="width:110px" value="' + def[x[0]] + '" onchange="setDefCosto(\'' + x[0] + '\',this.value)"></label>';
     }).join('') + '</div></div>';
-  if (!rutas.length) h += '<div class="card mut">No hay rutas con destinos. Arma las rutas en "Rutas Hoy" y aquí aparecen sus costos.</div>';
+  if (!rutas.length) h += '<div class="card mut">No hay rutas con destinos. Arma las rutas en "Rutas Diarias" y aquí aparecen sus costos.</div>';
   rutas.forEach(function (r, i) {
     var c = cal[i], sinM = c.filas.filter(function (f) { return !f.t; }).length;
     h += '<div class="card"><h2>RUTA ' + r.n + ' — ' + esc(r.piloto || '(sin piloto)') + ' <small class="mut">Placa: ' + esc(r.placa || '-') + '</small>' + (sinM ? ' <small style="color:var(--bad)">· ' + sinM + ' sin tarifa</small>' : '') + '</h2><div class="tw"><table class="ct">' +
@@ -1708,7 +1708,7 @@ function cargarPegado() {
   var modo = document.querySelector('input[name=modo]:checked').value;
   if (modo === 'reemplazar') {
     if (S.pedidos.length && !confirm('Esto borra los ' + S.pedidos.length + ' pedidos anteriores y las rutas se arman de nuevo con los nuevos. ¿Continuar?')) return;
-    S.pedidos = nuevos; S.rutas.forEach(function (r) { r.destinos = []; r.obs = ''; }); S.nuevos = {};
+    S.pedidos = nuevos; S.rutas.forEach(function (r) { r.destinos = []; r.obs = ''; r.piloto = ''; r.placa = ''; }); S.nuevos = {};
     S.cfg.sinAuto = []; api('guardarConfig', { sinAuto: [] }).catch(function () {});
   } else {
     nuevos.forEach(function (n) { var p = pedidoDe(n.destino); if (p) { p.m += n.m; p.t += n.t; p.q += n.q; p.k += n.k; if (n.com) p.com = n.com; } else S.pedidos.push(n); });
