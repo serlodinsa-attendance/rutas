@@ -1071,8 +1071,35 @@ function guardarDia() {
 }
 function editRent(f, c, v) { var d = rentData(), k = d.findIndex(function (x) { return x[0] === f; }); if (k < 0) return; d[k][c] = parseFloat(v) || 0; guardarRent(); renderRent(); }
 function borrarRent(f) { if (!confirm('¿Borrar el registro del ' + f + '?')) return; S.cfg.rentabilidad = rentData().filter(function (x) { return x[0] !== f; }); guardarRent(); renderRent(); }
+function rentHoyHtml(d, hoy) {
+  var hr = null, prev = null;
+  d.forEach(function (x) { if (x[0] === hoy) hr = x; else if (x[0] < hoy && (!prev || x[0] > prev[0])) prev = x; });
+  var fh = hoy.split('-').reverse().join('/');
+  var base = 'border-left:4px solid #2563eb;';
+  if (!hr) return '<div style="' + base + 'flex:1;min-width:260px"><span>📅 Hoy (' + fh + ')</span><b style="font-size:14px">Aún sin datos: actualiza los costos de rutas y se llena solo.</b></div>';
+  var mg = hr[1] ? (hr[2] / hr[1] * 100) : 0;
+  var cmp = '';
+  if (prev) { var dif = hr[2] - prev[2]; cmp = '<span style="color:' + (dif < 0 ? '#b91c1c' : '#047857') + '">' + (dif < 0 ? '▼ ' : '▲ ') + q2(Math.abs(dif)) + ' vs ' + prev[0].split('-').reverse().join('/') + '</span>'; }
+  return '<div style="' + base + '"><span>📅 Hoy (' + fh + ') · Ingreso</span><b>' + q2(hr[1]) + '</b></div>' +
+    '<div class="' + (hr[2] < 0 ? 'neg' : 'pos') + '"><span>Rentabilidad del día (utilidad)</span><b>' + q2(hr[2]) + '</b>' + cmp + '</div>' +
+    '<div><span>Margen del día</span><b>' + mg.toFixed(1) + '%</b></div>';
+}
+function rentAuto() {
+  if (!USR || USR.rol !== 'super') return;
+  var t = totalesDelDia(); if (!t[0] && !t[1]) return;
+  var hoy = hoyISO(), d = rentData(), k = d.findIndex(function (x) { return x[0] === hoy; });
+  if (k >= 0) { if (d[k][1] === t[0] && d[k][2] === t[1]) return; d[k] = [hoy, t[0], t[1]]; }
+  else {
+    var prev = null; d.forEach(function (x) { if (x[0] < hoy && (!prev || x[0] > prev[0])) prev = x; });
+    if (prev && prev[1] === t[0] && prev[2] === t[1]) return;
+    d.push([hoy, t[0], t[1]]);
+  }
+  d.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+  guardarRent();
+}
 function renderRent() {
   if (!$('rent')) return;
+  rentAuto();
   var d = rentData().slice().sort(function (a, b) { return a[0] < b[0] ? 1 : -1; });
   var hoy = hoyISO(), mesAct = hoy.slice(0, 7), mI = 0, mU = 0, mD = 0, sem = {}, mes = {};
   d.forEach(function (x) {
@@ -1091,7 +1118,7 @@ function renderRent() {
     '<button class="b sec" onclick="traerDeCostos()" style="align-self:flex-end">⬇ Traer de Costos de Rutas</button>' +
     '<button class="b ok" onclick="guardarDia()" style="align-self:flex-end">Guardar día</button></div>' +
     '<p class="mut" style="margin:6px 0 0">“Traer de Costos de Rutas” copia el ingreso y la utilidad total de las rutas de hoy. Si ya existe la fecha, te pregunta si la reemplazas.</p></div>';
-  h += '<div class="card"><h2>' + MESES[Number(mesAct.slice(5)) - 1] + ' ' + mesAct.slice(0, 4) + ' (este mes)</h2><div class="cres"><div><span>Ingreso bruto</span><b>' + q2(mI) + '</b></div><div class="' + (mU < 0 ? 'neg' : 'pos') + '"><span>Utilidad</span><b>' + q2(mU) + '</b></div><div><span>Días registrados</span><b>' + mD + '</b></div></div></div>';
+  h += '<div class="card"><h2>' + MESES[Number(mesAct.slice(5)) - 1] + ' ' + mesAct.slice(0, 4) + ' (este mes)</h2><div class="cres"><div><span>Ingreso bruto</span><b>' + q2(mI) + '</b></div><div class="' + (mU < 0 ? 'neg' : 'pos') + '"><span>Utilidad</span><b>' + q2(mU) + '</b></div><div><span>Días registrados</span><b>' + mD + '</b></div></div><div class="cres" style="margin-top:10px">' + rentHoyHtml(d, hoy) + '</div></div>';
   h += '<div class="card"><h2>Totales por semana</h2>' + tab(['Semana', 'Días', 'Ingreso bruto', 'Utilidad'], semK.map(function (k) {
     var s = sem[k], f = new Date(s.l.getTime()); f.setDate(f.getDate() + 6);
     return '<tr><td>Sem ' + semISO(s.l) + ' (' + d2(s.l.getDate()) + '/' + d2(s.l.getMonth() + 1) + ' - ' + d2(f.getDate()) + '/' + d2(f.getMonth() + 1) + ')</td>' + rs(s.n) + rs(q2(s.i)) + rs(q2(s.u)) + '</tr>';
