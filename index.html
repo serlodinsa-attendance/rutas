@@ -798,7 +798,7 @@ function descargarAsignacion() {
     ws.mergeCells(fila, 1, fila, 2); ws.mergeCells(fila, 3, fila, 4); ws.mergeCells(fila, 5, fila, 7);
     var a = ws.getCell(fila, 1); a.value = 'Piloto: ' + (r.piloto || '(sin asignar)'); estilo(a, { bold: true, size: 13, fill: CLARO });
     var b = ws.getCell(fila, 3); b.value = 'Placa: ' + (r.placa || '—'); estilo(b, { bold: true, size: 12, fill: CLARO });
-    var c = ws.getCell(fila, 5); var _d = new Date(); c.value = 'Código: RUTA ' + r.n + ' (' + ('0' + r.n).slice(-2) + '-' + ('0' + _d.getDate()).slice(-2) + ('0' + (_d.getMonth() + 1)).slice(-2) + _d.getFullYear() + ')'; estilo(c, { bold: true, size: 12, fill: CLARO });
+    var c = ws.getCell(fila, 5); var _d = new Date(); c.value = 'Código: ' + ('0' + r.n).slice(-2) + '-' + ('0' + _d.getDate()).slice(-2) + ('0' + (_d.getMonth() + 1)).slice(-2) + _d.getFullYear(); estilo(c, { bold: true, size: 12, fill: CLARO });
     ['B', 'D', 'F', 'G'].forEach(function (col) { estilo(ws.getCell(col + fila), { fill: CLARO }); });
     ws.getRow(fila).height = 24; fila++;
     ['Destino', 'Departamento', 'MOTO', 'TORO', 'QUTE', 'KAYO', 'Comentario'].forEach(function (h, i) { var x = ws.getCell(fila, i + 1); x.value = h; estilo(x, { bold: true, color: 'FFFFFFFF', fill: AZUL, h: 'center' }); });
