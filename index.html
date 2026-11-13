@@ -117,7 +117,7 @@ nav button.low{color:#fca5a5}
 <header>
   <h1>Panel de Control SERLODINSA</h1>
   <nav id="nav">
-    <button data-v="rutas" class="on">Rutas Diarias</button>
+    <button data-v="rutas" class="on">Rutas Diarias</button> <button data-v="liq">Liquidación de rutas</button>
     <button data-v="pedidos">Pedidos</button>
     <button data-v="costos">Costos de Rutas</button>
     <button data-v="rent">Rentabilidad</button>
@@ -139,7 +139,7 @@ nav button.low{color:#fca5a5}
     <button class="b sec" onclick="reAuto()">Acomodar pendientes por departamento</button>
     <button class="b sec" id="btnRec" onclick="recuperarBorrados()" style="display:none">↩ Recuperar borrados</button>
     <button class="b" onclick="descargarExcel()">⬇ Descargar Excel</button>
-    <button class="b" style="background:#0f766e" onclick="descargarAsignacion()">⬇ Asignación final pilotos</button>
+    <button class="b" style="background:#0f766e" onclick="descargarAsignacion()">⬇ Asignación final pilotos</button> <button class="b" style="background:#7c3aed" onclick="liqEnviar()">📋 Enviar a liquidación</button>
   </div>
   <div id="pool"></div>
   <div class="grid" id="grid"></div>
@@ -407,7 +407,7 @@ nav button.low{color:#fca5a5}
     <p><a id="hojaLink" href="#" target="_blank" rel="noopener">Abrir la hoja de Google con todos los datos</a></p>
   </div>
 </section>
-</main>
+<section id="v-liq" class="view"> <div class="card"> <h2>Liquidación de rutas</h2> <p class="mut">Rutas enviadas desde Rutas Diarias. Abre cada ruta con la flecha para ver destino por destino y marcar devoluciones.</p> <div class="row" style="gap:8px;margin-bottom:8px"> <input id="liq_q" placeholder="Buscar por piloto, código de ruta, placa o destino..." style="flex:1;min-width:220px" oninput="LIQ.q=this.value;renderLiq()"> <input id="liq_f" type="date" onchange="LIQ.f=this.value;renderLiq()"> <button class="b sec" onclick="LIQ.q='';LIQ.f='';$('liq_q').value='';$('liq_f').value='';renderLiq()">Limpiar</button> </div> <div id="liq_res" class="mut"></div> </div> <div id="liq_lista"></div> </section> </main>
 
 <div class="modal" id="mm"><div class="box">
   <h2 id="mt" style="margin-top:0">Agregar destino</h2>
@@ -697,7 +697,7 @@ function renderRutas() {
   $('grid').innerHTML = S.rutas.map(function (r) {
     var t = totalesRuta(r), c = r.cap || [0, 0, 0, 0];
     var chip = function (n, v, cap) { return '<span class="' + (cap && v > cap ? 'exc' : '') + '">' + n + ' ' + v + (cap ? '/' + cap : '') + '</span>'; };
-    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span class="rdrag" draggable="true" data-rd="' + r.n + '" title="Arrastra para cambiar de posición">⠿ RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos<button class="del" title="Mover esta ruta a otra posición (cambia su número)" onclick="moverRuta(' + r.n + ')">⇅</button><button class="del" title="Borrar esta ruta" onclick="borrarRuta(' + r.n + ')">🗑</button></small></div>' +
+    return '<div class="ruta" data-ruta="' + r.n + '"><div class="rh"><div class="t"><span class="rdrag" draggable="true" data-rd="' + r.n + '" title="Arrastra para cambiar de posición">⠿ RUTA ' + r.n + '</span><small>' + r.destinos.length + ' destinos<button class="del" title="Mover esta ruta a otra posición (cambia su número)" onclick="moverRuta(' + r.n + ')">⇅</button><button class="del" title="Enviar esta ruta a liquidación" onclick="liqEnviar([' + r.n + '])">📋</button><button class="del" title="Borrar esta ruta" onclick="borrarRuta(' + r.n + ')">🗑</button></small></div>' +
       '<input placeholder="Piloto" list="pilotos" value="' + esc(r.piloto) + '" onchange="setRuta(' + r.n + ',\'piloto\',this.value)">' +
       '<div class="r2"><input placeholder="Placa" value="' + esc(r.placa) + '" onchange="setRuta(' + r.n + ',\'placa\',this.value)">' +
       '<input placeholder="Vehículo" value="' + esc(r.vehiculo) + '" onchange="setRuta(' + r.n + ',\'vehiculo\',this.value)"></div>' +
@@ -1706,6 +1706,102 @@ function agregarLoteManual() {
   $('m_msg').textContent = '✔ ' + nuevos + ' destinos nuevos, ' + cambiados + ' actualizados' + (nRuta > 0 ? ' en la Ruta ' + nRuta : '') + (salt.length ? '. Sin unidades (omitidos): ' + salt.length : '') + '.';
   renderTodo(); guardarTodo();
 }
+/* ---------- liquidación de rutas ---------- */
+var LIQ = { q: '', f: '', ab: {} };
+var LIQ_DEV = [['', 'Sin devolución'], ['dev', 'Devolución'], ['dsc', 'Devolución con daños sin cobro'], ['dcc', 'Devolución con daños a cobro']];
+var LIQ_COL = { dev: '#fef9c3', dsc: '#ffedd5', dcc: '#fecaca' };
+function liqHoy() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function liqFechaTxt(f) { return f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4); }
+function liqCod(n, f) { return ('0' + n).slice(-2) + '-' + f.slice(8, 10) + f.slice(5, 7) + f.slice(0, 4); }
+function liqTitulo(x) { return 'RUTA ' + x.n + ' - UMA - ' + (x.piloto ? x.piloto.toUpperCase() : 'SIN PILOTO') + ' (' + x.cod + ')'; }
+function liqTodas() {
+  var out = [];
+  Object.keys(S.cfg).forEach(function (k) { if (k.indexOf('liq_') === 0 && Array.isArray(S.cfg[k])) S.cfg[k].forEach(function (x) { out.push(x); }); });
+  out.sort(function (a, b) { return a.f < b.f ? 1 : a.f > b.f ? -1 : a.n - b.n; });
+  return out;
+}
+function liqBuscar(id) {
+  var r = null;
+  Object.keys(S.cfg).forEach(function (k) {
+    if (k.indexOf('liq_') !== 0 || !Array.isArray(S.cfg[k])) return;
+    S.cfg[k].forEach(function (x, i) { if (x.id === id) r = { k: k, x: x, i: i }; });
+  });
+  return r;
+}
+function liqGuardar(k) {
+  var o = {}; o[k] = S.cfg[k];
+  setEstado('Guardando...', '#fde68a');
+  api('guardarConfig', o).then(function () { setEstado('Guardado', '#86efac'); }).catch(function (e) { setEstado('Error: ' + e.message, '#fca5a5'); });
+}
+function liqEnviar(nums) {
+  var f = liqHoy(), k = 'liq_' + f;
+  var lista = S.rutas.filter(function (r) { return r.destinos.length && (!nums || nums.indexOf(r.n) >= 0); });
+  if (!lista.length) { alert('No hay rutas con destinos para enviar a liquidación.'); return; }
+  if (!Array.isArray(S.cfg[k])) S.cfg[k] = [];
+  var arr = S.cfg[k];
+  var sinP = lista.filter(function (r) { return !r.piloto; }).map(function (r) { return r.n; });
+  var ya = lista.filter(function (r) { return arr.some(function (x) { return x.cod === liqCod(r.n, f); }); }).map(function (r) { return r.n; });
+  var msg = '¿Enviar a liquidación ' + lista.length + ' ruta(s) de hoy (Ruta ' + lista.map(function (r) { return r.n; }).join(', ') + ')?';
+  if (sinP.length) msg += '\n\nOJO: sin piloto asignado: Ruta ' + sinP.join(', ');
+  if (ya.length) msg += '\n\nYa estaban enviadas hoy (se actualizan y conservan sus devoluciones): Ruta ' + ya.join(', ');
+  if (!confirm(msg)) return;
+  lista.forEach(function (r) {
+    var cod = liqCod(r.n, f), prev = null, pi = -1;
+    arr.forEach(function (x, i) { if (x.cod === cod) { prev = x; pi = i; } });
+    var dests = r.destinos.map(function (d) {
+      var p = pedidoDe(d) || { destino: d, m: 0, t: 0, q: 0, k: 0, com: '' }, dep = '', di = S.dmap[norm(d)], old = null;
+      if (di !== undefined) dep = S.dicc[di][2] || '';
+      if (prev) prev.destinos.forEach(function (y) { if (norm(y.d) === norm(d)) old = y; });
+      return { d: p.destino || d, dep: dep, m: p.m || 0, t: p.t || 0, q: p.q || 0, k: p.k || 0, com: p.com || '', dv: old ? old.dv : '', nt: old ? old.nt : '' };
+    });
+    var rec = { id: prev ? prev.id : dslId(), cod: cod, n: r.n, f: f, piloto: r.piloto || '', placa: r.placa || '', vehiculo: r.vehiculo || '', destinos: dests };
+    if (prev) arr[pi] = rec; else arr.push(rec);
+  });
+  liqGuardar(k);
+  alert('✔ Enviadas a liquidación: Ruta ' + lista.map(function (r) { return r.n; }).join(', ') + '. Búscalas en la pestaña "Liquidación de rutas".');
+}
+function liqSet(id, i, campo, val) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  h.x.destinos[i][campo] = val; liqGuardar(h.k); renderLiq();
+}
+function liqQuitar(id) {
+  var h = liqBuscar(id); if (!h) return;
+  if (!confirm('¿Quitar ' + liqTitulo(h.x) + ' de liquidación?')) return;
+  S.cfg[h.k].splice(h.i, 1); liqGuardar(h.k); renderLiq();
+}
+function renderLiq() {
+  var vw = $('v-liq'); if (!vw || !vw.classList.contains('on')) return;
+  var q = norm(LIQ.q);
+  var lista = liqTodas().filter(function (x) {
+    if (LIQ.f && x.f !== LIQ.f) return false;
+    if (!q) return true;
+    var t = [x.piloto, x.cod, x.placa, 'ruta ' + x.n, liqFechaTxt(x.f)].concat(x.destinos.map(function (d) { return d.d; })).join(' ');
+    return norm(t).indexOf(q) >= 0;
+  });
+  var devs = 0, cobro = 0;
+  lista.forEach(function (x) { x.destinos.forEach(function (d) { if (d.dv) devs++; if (d.dv === 'dcc') cobro++; }); });
+  $('liq_res').textContent = lista.length + ' ruta(s) · ' + devs + ' devolución(es) · ' + cobro + ' con daños a cobro';
+  var h = '', dia = '';
+  lista.forEach(function (x) {
+    if (x.f !== dia) { dia = x.f; h += '<h3 style="margin:14px 2px 6px;font-size:14px">' + liqFechaTxt(x.f) + '</h3>'; }
+    var nd = 0, nc = 0, tt = [0, 0, 0, 0];
+    x.destinos.forEach(function (d) { if (d.dv) nd++; if (d.dv === 'dcc') nc++; tt[0] += d.m; tt[1] += d.t; tt[2] += d.q; tt[3] += d.k; });
+    h += '<details class="card" style="padding:0;margin-bottom:8px"' + (LIQ.ab[x.id] ? ' open' : '') + ' ontoggle="LIQ.ab[\'' + x.id + '\']=this.open">';
+    h += '<summary style="cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>' + esc(liqTitulo(x)) + '</b>';
+    h += '<span class="mut">' + x.destinos.length + ' destinos' + (x.placa ? ' · ' + esc(x.placa) : '') + '</span>';
+    if (nd) h += '<span style="background:#fef9c3;border-radius:10px;padding:1px 8px;font-size:12px">' + nd + ' devolución(es)</span>';
+    if (nc) h += '<span style="background:#fecaca;border-radius:10px;padding:1px 8px;font-size:12px">' + nc + ' a cobro</span>';
+    h += '</summary><div style="padding:0 14px 12px"><div class="tw" style="max-height:none"><table><tr><th>Destino</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Devolución</th><th>Nota</th></tr>';
+    x.destinos.forEach(function (d, i) {
+      h += '<tr' + (d.dv ? ' style="background:' + LIQ_COL[d.dv] + '"' : '') + '><td>' + esc(d.d) + (d.dep ? '<br><small class="mut">' + esc(d.dep) + '</small>' : '') + '</td><td>' + d.m + '</td><td>' + d.t + '</td><td>' + d.q + '</td><td>' + d.k + '</td>';
+      h += '<td><select onchange="liqSet(\'' + x.id + '\',' + i + ',\'dv\',this.value)">' + LIQ_DEV.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (d.dv || '') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td>';
+      h += '<td><input value="' + esc(d.nt || '') + '" placeholder="Detalle (opcional)" style="min-width:150px" onchange="liqSet(\'' + x.id + '\',' + i + ',\'nt\',this.value)"></td></tr>';
+    });
+    h += '<tr><th>Total</th><th>' + tt[0] + '</th><th>' + tt[1] + '</th><th>' + tt[2] + '</th><th>' + tt[3] + '</th><th></th><th></th></tr></table></div>';
+    h += '<div style="margin-top:8px;text-align:right"><button class="b bad" onclick="liqQuitar(\'' + x.id + '\')">Quitar de liquidación</button></div></div></details>';
+  });
+  $('liq_lista').innerHTML = h || '<div class="card mut">Aún no hay rutas en liquidación. Envíalas desde Rutas Diarias con el botón "Enviar a liquidación".</div>';
+}
 function guardarManual(otro) {
   var d = $('m_d').value.trim();
   if (!d) { $('m_msg').textContent = 'Escribe el destino.'; return; }
@@ -1969,7 +2065,7 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
-document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); });
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); renderLiq(); });
 ['lu', 'lk'].forEach(function (i) { $(i).addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); }); });
 $('leye').onclick = function () { var k = $('lk'); k.type = k.type === 'password' ? 'text' : 'password'; };
 arranque();
