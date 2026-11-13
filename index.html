@@ -421,7 +421,7 @@ nav button.low{color:#fca5a5}
   </div>
   <label>Comentario</label><input id="m_c">
   <label>Ruta</label><select id="m_r"></select>
-  <label id="m_sl" style="display:none"><input type="checkbox" id="m_s"> Sumar a las unidades que ya tiene (si no, se reemplazan)</label>
+  <details id="m_bk" style="margin-top:10px"><summary class="mut" style="cursor:pointer">Pegar varios destinos desde Excel (a la ruta elegida)</summary><p class="mut" style="margin:6px 0">Columnas: DESTINO, MOTO, TORO, QUTE, KAYO, COMENTARIO. Todos se agregan a la ruta seleccionada arriba.</p><textarea id="m_bulk" placeholder="Pega aquí..." style="width:100%;min-height:110px"></textarea><div class="row" style="margin-top:6px"><select id="m_bm"><option value="r">Si el destino ya existe: reemplazar unidades</option><option value="s">Si el destino ya existe: sumar unidades</option></select><button class="b ok" onclick="agregarLoteManual()">Agregar lote</button></div></details> <label id="m_sl" style="display:none"><input type="checkbox" id="m_s"> Sumar a las unidades que ya tiene (si no, se reemplazan)</label>
   <p id="m_msg" class="q"></p>
   <div class="row" style="justify-content:flex-end;margin-top:8px">
     <button class="b bad" id="m_del" style="display:none;margin-right:auto" onclick="borrarManual()">Quitar pedido</button>
@@ -1666,7 +1666,7 @@ function opcionesRuta(sel) {
   $('m_r').innerHTML = o; if (sel !== undefined) $('m_r').value = String(sel);
 }
 function abrirManual() {
-  editando = ''; $('mt').textContent = 'Agregar destino / unidades'; $('m_go').style.display = '';
+  editando = ''; $('mt').textContent = 'Agregar destino / unidades'; $('m_go').style.display = ''; $('m_bk').style.display = ''; $('m_bulk').value = '';
   $('m_d').value = ''; $('m_d').disabled = false; ['m_m', 'm_t', 'm_q', 'm_k'].forEach(function (i) { $(i).value = 0; }); $('m_c').value = '';
   $('dl').innerHTML = S.dicc.slice(0, 3000).map(function (r) { return '<option value="' + esc(r[0]) + '">'; }).join('');
   opcionesRuta(0); $('m_sl').style.display = 'block'; $('m_s').checked = true; $('m_del').style.display = 'none'; $('m_msg').textContent = '';
@@ -1674,13 +1674,38 @@ function abrirManual() {
 }
 function editarManual(d) {
   var p = pedidoDe(d); if (!p) return;
-  editando = p.destino; $('mt').textContent = 'Editar pedido'; $('m_go').style.display = 'none';
+  editando = p.destino; $('mt').textContent = 'Editar pedido'; $('m_go').style.display = 'none'; $('m_bk').style.display = 'none';
   $('m_d').value = p.destino; $('m_d').disabled = true; $('m_m').value = p.m; $('m_t').value = p.t; $('m_q').value = p.q; $('m_k').value = p.k; $('m_c').value = p.com || '';
   var r = rutaDe(p.destino); opcionesRuta(r ? r.n : 0);
   $('m_sl').style.display = 'none'; $('m_s').checked = false; $('m_del').style.display = 'inline-block'; $('m_msg').textContent = '';
   $('mm').classList.add('on');
 }
 function cerrarManual() { $('mm').classList.remove('on'); }
+function agregarLoteManual() {
+  var nRuta = Number($('m_r').value), suma = $('m_bm').value === 's', nuevos = 0, cambiados = 0, salt = [];
+  var filas = $('m_bulk').value.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim() !== ''; }).map(function (l) { return l.indexOf('\t') >= 0 ? l.split('\t') : l.split(';'); });
+  if (!filas.length) { $('m_msg').textContent = 'Pega los destinos primero.'; return; }
+  if (/destino/i.test(String(filas[0][0] || ''))) filas.shift();
+  filas.forEach(function (c) {
+    var d = String(c[0] || '').trim(); if (!d) return;
+    var u = [num(c[1]), num(c[2]), num(c[3]), num(c[4])], com = String(c[5] || '').trim();
+    if (!u[0] && !u[1] && !u[2] && !u[3]) { salt.push(d); return; }
+    var p = pedidoDe(d);
+    if (p) {
+      if (suma) { p.m += u[0]; p.t += u[1]; p.q += u[2]; p.k += u[3]; } else { p.m = u[0]; p.t = u[1]; p.q = u[2]; p.k = u[3]; }
+      if (com) p.com = com; cambiados++;
+    } else {
+      var dd = S.dmap[norm(d)]; if (dd !== undefined) d = S.dicc[dd][0];
+      p = { destino: d, m: u[0], t: u[1], q: u[2], k: u[3], com: com }; S.pedidos.push(p); nuevos++;
+    }
+    if (nRuta > 0) { var r0 = rutaDe(p.destino); if (!r0 || r0.n !== nRuta) moverA(p.destino, nRuta, null); }
+    else if (!rutaDe(p.destino)) { var n = sugerir(p.destino); if (n) { rutaObj(n, true).destinos.push(p.destino); S.nuevos[norm(p.destino)] = 1; } }
+  });
+  if (!nuevos && !cambiados) { $('m_msg').textContent = 'No se agregó nada: revisa que cada línea tenga unidades.'; return; }
+  $('m_bulk').value = ''; opcionesRuta(nRuta);
+  $('m_msg').textContent = '✔ ' + nuevos + ' destinos nuevos, ' + cambiados + ' actualizados' + (nRuta > 0 ? ' en la Ruta ' + nRuta : '') + (salt.length ? '. Sin unidades (omitidos): ' + salt.length : '') + '.';
+  renderTodo(); guardarTodo();
+}
 function guardarManual(otro) {
   var d = $('m_d').value.trim();
   if (!d) { $('m_msg').textContent = 'Escribe el destino.'; return; }
