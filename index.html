@@ -1836,7 +1836,7 @@ function liqEnPlanta(x) { var t = 0; x.destinos.forEach(function (d) { if (d.sc)
 function liqPlanta(x, i, d) {
   var a = '\'' + x.id + '\',' + i, tot = 0, ip = '';
   LIQ_UT.forEach(function (o) { var q = Number(d[o[0]]) || 0; if (!q) return; var n = Number(d.sc && d.sc[o[0]]) || 0; tot += n; ip += '<label style="margin-right:8px">' + o[1] + ' <input type="number" min="0" max="' + q + '" value="' + (n || '') + '" placeholder="0" style="width:52px" onchange="liqSC(' + a + ',\'' + o[0] + '\',this.value)"> <small class="mut">de ' + q + '</small></label>'; });
-  return '<details style="margin-top:4px"' + (tot || d.scn ? ' open' : '') + '><summary style="cursor:pointer;font-size:12px;color:' + (tot ? '#b91c1c' : '#64748b') + '">' + (tot ? '🏭 ' + tot + ' unidad(es) quedaron en planta' : '🏭 Quedó en planta') + '</summary><div style="padding:4px 0">' + ip + '<br><input value="' + esc(d.scn || '') + '" placeholder="Motivo (por qué quedó en planta)" style="width:100%;max-width:320px;margin-top:4px" onchange="liqSCN(' + a + ',this.value)"></div></details>';
+  return '<details style="margin-top:4px"' + (tot || d.scn ? ' open' : '') + '><summary style="cursor:pointer;font-size:12px;color:' + (tot ? '#b91c1c' : '#64748b') + '">' + (tot ? '🏭 ' + tot + ' unidad(es) no salieron de planta' : '🏭 No salió de planta') + '</summary><div style="padding:4px 0">' + ip + '<br><input value="' + esc(d.scn || '') + '" placeholder="Motivo (por qué no salió de planta)" style="width:100%;max-width:320px;margin-top:4px" onchange="liqSCN(' + a + ',this.value)"></div></details>';
 }
 function liqSC(id, i, c, v) {
   var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
@@ -1956,7 +1956,7 @@ function renderLiq() {
     h += x.lq ? '<span style="background:#bbf7d0;border-radius:10px;padding:1px 8px;font-size:12px">✔ Liquidada</span>' : '<span style="background:#e2e8f0;border-radius:10px;padding:1px 8px;font-size:12px">Pendiente de liquidar</span>';
     if (st.dev) h += '<span style="background:#fef9c3;border-radius:10px;padding:1px 8px;font-size:12px">' + st.dev + ' devolución(es)</span>';
     if (st.dcc) h += '<span style="background:#fecaca;border-radius:10px;padding:1px 8px;font-size:12px">' + st.dcc + ' a cobro' + (st.pen > 0 ? ' · ' + liqQ(st.pen) + ' pendiente' : '') + '</span>';
-    h += (liqEnPlanta(x) ? '<span style="background:#e9d5ff;border-radius:10px;padding:1px 8px;font-size:12px">🏭 ' + liqEnPlanta(x) + ' en planta</span>' : '') + '</summary><div style="padding:0 14px 12px"><div class="tw" style="max-height:none"><table><tr><th>Destino</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Devolución</th><th>Cobro</th><th>Foto</th><th>Nota</th></tr>';
+    h += (liqEnPlanta(x) ? '<span style="background:#e9d5ff;border-radius:10px;padding:1px 8px;font-size:12px">🏭 ' + liqEnPlanta(x) + ' no salió de planta</span>' : '') + '</summary><div style="padding:0 14px 12px"><div class="tw" style="max-height:none"><table><tr><th>Destino</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Devolución</th><th>Cobro</th><th>Foto</th><th>Nota</th></tr>';
     x.destinos.forEach(function (d, i) {
       var cid = x.id + '_' + i;
       h += '<tr' + (d.dv ? ' style="background:' + LIQ_COL[d.dv] + '"' : '') + '><td>' + esc(d.d) + (d.dep ? '<br><small class="mut">' + esc(d.dep) + '</small>' : '') + liqPlanta(x, i, d) + '</td>' + liqCel(d, 'm') + liqCel(d, 't') + liqCel(d, 'q') + liqCel(d, 'k');
