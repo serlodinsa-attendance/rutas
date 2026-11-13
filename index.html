@@ -1768,7 +1768,7 @@ function liqEnviar(nums) {
       if (di !== undefined) dep = S.dicc[di][2] || '';
       if (prev) prev.destinos.forEach(function (y) { if (norm(y.d) === norm(d)) old = y; });
       var o = { d: p.destino || d, dep: dep, m: p.m || 0, t: p.t || 0, q: p.q || 0, k: p.k || 0, com: p.com || '', dv: '', nt: '' };
-      if (old) ['dv', 'nt', 'mo', 'ec', 'ecf', 'ecp', 'ft'].forEach(function (c) { if (old[c] !== undefined) o[c] = old[c]; });
+      if (old) ['dv', 'nt', 'mo', 'ec', 'ecf', 'ecp', 'ft', 'pe', 'du'].forEach(function (c) { if (old[c] !== undefined) o[c] = old[c]; });
       return o;
     });
     var rec = { id: prev ? prev.id : dslId(), cod: cod, n: r.n, f: f, piloto: r.piloto || '', placa: r.placa || '', vehiculo: r.vehiculo || '', destinos: dests };
@@ -1777,6 +1777,58 @@ function liqEnviar(nums) {
   });
   liqGuardar(k);
   alert('✔ Enviadas a liquidación: Ruta ' + lista.map(function (r) { return r.n; }).join(', ') + '. Búscalas en la pestaña "Liquidación de rutas".');
+}
+var LIQ_UT = [['m', 'Moto'], ['t', 'Toro'], ['q', 'Qute'], ['k', 'Kayo']];
+function liqPilotos() {
+  var o = {}, r = [];
+  (Array.isArray(S.cfg.lpil) ? S.cfg.lpil : []).forEach(function (n) { o[norm(n)] = n; });
+  liqTodas().forEach(function (x) { if (x.piloto) o[norm(x.piloto)] = x.piloto; x.destinos.forEach(function (d) { if (d.pe) o[norm(d.pe)] = d.pe; }); });
+  Object.keys(o).forEach(function (k) { r.push(o[k]); });
+  return r.sort();
+}
+function liqDanoRow(x, i, d) {
+  var id = x.id, dl = 'dl_' + id + '_' + i, a = '\'' + id + '\',' + i;
+  var h = '<tr style="background:' + LIQ_COL[d.dv] + '"><td colspan="9" style="padding:6px 10px 10px 24px">';
+  h += '<datalist id="' + dl + '">' + liqPilotos().map(function (n) { return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>';
+  h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b>Piloto que entregó:</b> <input list="' + dl + '" value="' + esc(d.pe || '') + '" placeholder="' + esc(x.piloto || 'Nombre del piloto') + '" style="min-width:200px" onchange="liqPe(' + a + ',this.value)"> <small class="mut">' + (d.pe ? '' : 'vacío = piloto asignado (' + esc(x.piloto || 'sin piloto') + ')') + '</small></div>';
+  (d.du || []).forEach(function (u, j) {
+    var b = a + ',' + j;
+    h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span class="mut">Unidad dañada:</span><select onchange="liqDU(' + b + ',\'t\',this.value)">' + LIQ_UT.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === u.t ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+    h += '<input value="' + esc(u.ch || '') + '" placeholder="Chasis" style="width:180px" onchange="liqDU(' + b + ',\'ch\',this.value)">';
+    h += '<input value="' + esc(u.ob || '') + '" placeholder="Daño / observación" style="min-width:260px;flex:1" onchange="liqDU(' + b + ',\'ob\',this.value)">';
+    h += '<button class="b sec" onclick="liqDUdel(' + b + ')">✕</button></div>';
+  });
+  h += '<button class="b sec" onclick="liqDUadd(' + a + ')">+ Unidad dañada</button></td></tr>';
+  return h;
+}
+function liqPe(id, i, v) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  v = (v || '').trim(); var d = h.x.destinos[i], ks = [h.k];
+  if (v) d.pe = v; else delete d.pe;
+  if (v) {
+    var L = Array.isArray(S.cfg.lpil) ? S.cfg.lpil : (S.cfg.lpil = []);
+    if (!L.some(function (n) { return norm(n) === norm(v); })) { L.push(v); ks.push('lpil'); }
+  }
+  liqGuardar(ks); renderLiq();
+}
+function liqDUadd(id, i) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  var d = h.x.destinos[i], t = 'm';
+  ['m', 't', 'q', 'k'].some(function (c) { if (d[c] > 0) { t = c; return true; } return false; });
+  (d.du = d.du || []).push({ t: t, ch: '', ob: '' });
+  liqGuardar(h.k); renderLiq();
+}
+function liqDU(id, i, j, c, v) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  var u = (h.x.destinos[i].du || [])[j]; if (!u) return;
+  u[c] = c === 'ch' ? String(v).trim().toUpperCase() : v;
+  liqGuardar(h.k);
+}
+function liqDUdel(id, i, j) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i] || !h.x.destinos[i].du) return;
+  if (!confirm('¿Quitar esta unidad dañada?')) return;
+  h.x.destinos[i].du.splice(j, 1);
+  liqGuardar(h.k); renderLiq();
 }
 function liqSet(id, i, campo, val) {
   var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
@@ -1852,7 +1904,7 @@ function renderLiq() {
     if (LIQ.e === 'liq' && !x.lq) return false;
     if (LIQ.e === 'cobro' && !(liqStats(x).pen > 0 || x.destinos.some(function (d) { return d.dv === 'dcc' && !(d.mo > 0) && d.ec !== 'x'; }))) return false;
     if (!q) return true;
-    var t = [x.piloto, x.cod, x.placa, 'ruta ' + x.n, liqFechaTxt(x.f)].concat(x.destinos.map(function (d) { return d.d; })).join(' ');
+    var t = [x.piloto, x.cod, x.placa, x.destinos.map(function (d) { return (d.pe || '') + ' ' + (d.du || []).map(function (u) { return u.ch; }).join(' '); }).join(' '), 'ruta ' + x.n, liqFechaTxt(x.f)].concat(x.destinos.map(function (d) { return d.d; })).join(' ');
     return norm(t).indexOf(q) >= 0;
   });
   var tdev = 0, tcc = 0, tpen = 0, pil = {};
@@ -1860,7 +1912,7 @@ function renderLiq() {
     var st = liqStats(x); tdev += st.dev; tcc += st.dcc; tpen += st.pen;
     var kp = norm(x.piloto) || '(sin piloto)';
     var p = pil[kp] || (pil[kp] = { n: x.piloto || '(sin piloto)', rutas: 0, dev: 0, dsc: 0, dcc: 0, tot: 0, cob: 0, per: 0, pen: 0 });
-    p.rutas++; p.dev += st.dev; p.dsc += st.dsc; p.dcc += st.dcc; p.tot += st.tot; p.cob += st.cob; p.per += st.per; p.pen += st.pen;
+    p.rutas++; x.destinos.forEach(function (d) { if (!d.dv) return; var pn = d.pe || x.piloto || '', kk = norm(pn) || '(sin piloto)'; var pp = pil[kk] || (pil[kk] = { n: pn || '(sin piloto)', rutas: 0, dev: 0, dsc: 0, dcc: 0, tot: 0, cob: 0, per: 0, pen: 0 }); pp.dev++; if (d.dv === 'dsc') pp.dsc++; if (d.dv === 'dcc') { pp.dcc++; var m = Number(d.mo) || 0; pp.tot += m; if (d.ec === 'c') pp.cob += m; else if (d.ec === 'x') pp.per += m; else pp.pen += m; } });
   });
   $('liq_res').textContent = lista.length + ' ruta(s) · ' + tdev + ' devolución(es) · ' + tcc + ' con daños a cobro · ' + liqQ(tpen) + ' pendiente de cobro';
   var pl = Object.keys(pil).map(function (k) { return pil[k]; }).filter(function (p) { return p.dev; }).sort(function (a, b) { return b.pen - a.pen || b.dev - a.dev; });
@@ -1895,7 +1947,7 @@ function renderLiq() {
       if (d.dv) {
         h += '<td style="white-space:nowrap">' + (d.ft && S.cfg['limg_' + d.ft] ? '<img src="' + S.cfg['limg_' + d.ft] + '" style="height:34px;border-radius:4px;cursor:pointer;vertical-align:middle" onclick="liqVerFoto(\'' + d.ft + '\')" title="Ver foto"> ' : '') + '<label class="b sec" style="cursor:pointer;display:inline-block">📷<input type="file" accept="image/*" style="display:none" onchange="liqFoto(\'' + x.id + '\',' + i + ',this)"></label></td>';
       } else h += '<td></td>';
-      h += '<td><input value="' + esc(d.nt || '') + '" placeholder="Detalle (opcional)" style="min-width:150px" onchange="liqSet(\'' + x.id + '\',' + i + ',\'nt\',this.value)"></td></tr>';
+      h += '<td><input value="' + esc(d.nt || '') + '" placeholder="Detalle (opcional)" style="min-width:150px" onchange="liqSet(\'' + x.id + '\',' + i + ',\'nt\',this.value)"></td></tr>'; if (d.dv === 'dsc' || d.dv === 'dcc') h += liqDanoRow(x, i, d);
     });
     h += '<tr><th>Total</th><th>' + tt[0] + '</th><th>' + tt[1] + '</th><th>' + tt[2] + '</th><th>' + tt[3] + '</th><th></th><th></th><th></th><th></th></tr></table></div>';
     h += '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + (x.lq ? '<span class="mut">Liquidada por ' + esc(x.lq.p || '') + ' el ' + esc(x.lq.f || '') + '</span>' : '') + '<button class="b ' + (x.lq ? 'sec' : 'ok') + '" onclick="liqLiquidar(\'' + x.id + '\')">' + (x.lq ? 'Quitar marca de liquidada' : '✔ Marcar ruta como liquidada') + '</button><button class="b bad" onclick="liqQuitar(\'' + x.id + '\')">Quitar de liquidación</button></div></div></details>';
