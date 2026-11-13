@@ -1768,7 +1768,7 @@ function liqEnviar(nums) {
       if (di !== undefined) dep = S.dicc[di][2] || '';
       if (prev) prev.destinos.forEach(function (y) { if (norm(y.d) === norm(d)) old = y; });
       var o = { d: p.destino || d, dep: dep, m: p.m || 0, t: p.t || 0, q: p.q || 0, k: p.k || 0, com: p.com || '', dv: '', nt: '' };
-      if (old) ['dv', 'nt', 'mo', 'ec', 'ecf', 'ecp', 'ft', 'pe', 'du'].forEach(function (c) { if (old[c] !== undefined) o[c] = old[c]; });
+      if (old) ['dv', 'nt', 'mo', 'ec', 'ecf', 'ecp', 'ft', 'pe', 'du', 'sc', 'scn'].forEach(function (c) { if (old[c] !== undefined) o[c] = old[c]; });
       return o;
     });
     var rec = { id: prev ? prev.id : dslId(), cod: cod, n: r.n, f: f, piloto: r.piloto || '', placa: r.placa || '', vehiculo: r.vehiculo || '', destinos: dests };
@@ -1828,6 +1828,26 @@ function liqDUdel(id, i, j) {
   var h = liqBuscar(id); if (!h || !h.x.destinos[i] || !h.x.destinos[i].du) return;
   if (!confirm('¿Quitar esta unidad dañada?')) return;
   h.x.destinos[i].du.splice(j, 1);
+  liqGuardar(h.k); renderLiq();
+}
+function liqEf(d, c) { return Math.max(0, (Number(d[c]) || 0) - (Number(d.sc && d.sc[c]) || 0)); }
+function liqCel(d, c) { var n = Number(d.sc && d.sc[c]) || 0; return '<td>' + liqEf(d, c) + (n ? ' <small style="color:#b91c1c;font-weight:700">(−' + n + ')</small>' : '') + '</td>'; }
+function liqEnPlanta(x) { var t = 0; x.destinos.forEach(function (d) { if (d.sc) Object.keys(d.sc).forEach(function (c) { t += Number(d.sc[c]) || 0; }); }); return t; }
+function liqPlanta(x, i, d) {
+  var a = '\'' + x.id + '\',' + i, tot = 0, ip = '';
+  LIQ_UT.forEach(function (o) { var q = Number(d[o[0]]) || 0; if (!q) return; var n = Number(d.sc && d.sc[o[0]]) || 0; tot += n; ip += '<label style="margin-right:8px">' + o[1] + ' <input type="number" min="0" max="' + q + '" value="' + (n || '') + '" placeholder="0" style="width:52px" onchange="liqSC(' + a + ',\'' + o[0] + '\',this.value)"> <small class="mut">de ' + q + '</small></label>'; });
+  return '<details style="margin-top:4px"' + (tot || d.scn ? ' open' : '') + '><summary style="cursor:pointer;font-size:12px;color:' + (tot ? '#b91c1c' : '#64748b') + '">' + (tot ? '🏭 ' + tot + ' unidad(es) quedaron en planta' : '🏭 Quedó en planta') + '</summary><div style="padding:4px 0">' + ip + '<br><input value="' + esc(d.scn || '') + '" placeholder="Motivo (por qué quedó en planta)" style="width:100%;max-width:320px;margin-top:4px" onchange="liqSCN(' + a + ',this.value)"></div></details>';
+}
+function liqSC(id, i, c, v) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  var d = h.x.destinos[i], q = Number(d[c]) || 0, n = Math.max(0, Math.min(q, Math.floor(Number(v) || 0)));
+  d.sc = d.sc || {}; if (n) d.sc[c] = n; else delete d.sc[c];
+  if (!Object.keys(d.sc).length) delete d.sc;
+  liqGuardar(h.k); renderLiq();
+}
+function liqSCN(id, i, v) {
+  var h = liqBuscar(id); if (!h || !h.x.destinos[i]) return;
+  v = (v || '').trim(); if (v) h.x.destinos[i].scn = v; else delete h.x.destinos[i].scn;
   liqGuardar(h.k); renderLiq();
 }
 function liqSet(id, i, campo, val) {
@@ -1929,17 +1949,17 @@ function renderLiq() {
   lista.forEach(function (x) {
     if (x.f !== dia) { dia = x.f; h += '<h3 style="margin:14px 2px 6px;font-size:14px">' + liqFechaTxt(x.f) + '</h3>'; }
     var st = liqStats(x), tt = [0, 0, 0, 0];
-    x.destinos.forEach(function (d) { tt[0] += d.m; tt[1] += d.t; tt[2] += d.q; tt[3] += d.k; });
+    x.destinos.forEach(function (d) { tt[0] += liqEf(d, 'm'); tt[1] += liqEf(d, 't'); tt[2] += liqEf(d, 'q'); tt[3] += liqEf(d, 'k'); });
     h += '<details class="card" style="padding:0;margin-bottom:8px"' + (LIQ.ab[x.id] ? ' open' : '') + ' ontoggle="LIQ.ab[\'' + x.id + '\']=this.open">';
     h += '<summary style="cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>' + esc(liqTitulo(x)) + '</b>';
     h += '<span class="mut">' + x.destinos.length + ' destinos' + (x.placa ? ' · ' + esc(x.placa) : '') + '</span>';
     h += x.lq ? '<span style="background:#bbf7d0;border-radius:10px;padding:1px 8px;font-size:12px">✔ Liquidada</span>' : '<span style="background:#e2e8f0;border-radius:10px;padding:1px 8px;font-size:12px">Pendiente de liquidar</span>';
     if (st.dev) h += '<span style="background:#fef9c3;border-radius:10px;padding:1px 8px;font-size:12px">' + st.dev + ' devolución(es)</span>';
     if (st.dcc) h += '<span style="background:#fecaca;border-radius:10px;padding:1px 8px;font-size:12px">' + st.dcc + ' a cobro' + (st.pen > 0 ? ' · ' + liqQ(st.pen) + ' pendiente' : '') + '</span>';
-    h += '</summary><div style="padding:0 14px 12px"><div class="tw" style="max-height:none"><table><tr><th>Destino</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Devolución</th><th>Cobro</th><th>Foto</th><th>Nota</th></tr>';
+    h += (liqEnPlanta(x) ? '<span style="background:#e9d5ff;border-radius:10px;padding:1px 8px;font-size:12px">🏭 ' + liqEnPlanta(x) + ' en planta</span>' : '') + '</summary><div style="padding:0 14px 12px"><div class="tw" style="max-height:none"><table><tr><th>Destino</th><th>M</th><th>T</th><th>Q</th><th>K</th><th>Devolución</th><th>Cobro</th><th>Foto</th><th>Nota</th></tr>';
     x.destinos.forEach(function (d, i) {
       var cid = x.id + '_' + i;
-      h += '<tr' + (d.dv ? ' style="background:' + LIQ_COL[d.dv] + '"' : '') + '><td>' + esc(d.d) + (d.dep ? '<br><small class="mut">' + esc(d.dep) + '</small>' : '') + '</td><td>' + d.m + '</td><td>' + d.t + '</td><td>' + d.q + '</td><td>' + d.k + '</td>';
+      h += '<tr' + (d.dv ? ' style="background:' + LIQ_COL[d.dv] + '"' : '') + '><td>' + esc(d.d) + (d.dep ? '<br><small class="mut">' + esc(d.dep) + '</small>' : '') + liqPlanta(x, i, d) + '</td>' + liqCel(d, 'm') + liqCel(d, 't') + liqCel(d, 'q') + liqCel(d, 'k');
       h += '<td><select onchange="liqSet(\'' + x.id + '\',' + i + ',\'dv\',this.value)">' + LIQ_DEV.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (d.dv || '') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></td>';
       if (d.dv === 'dcc') {
         h += '<td style="white-space:nowrap">Q <input type="number" min="0" step="0.01" value="' + (d.mo || '') + '" placeholder="Monto" style="width:80px" onchange="liqMonto(\'' + x.id + '\',' + i + ',this.value)"> <select onchange="liqCobro(\'' + x.id + '\',' + i + ',this.value)">' + LIQ_EC.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (d.ec || '') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' + (d.ec ? '<br><small class="mut">' + esc(d.ecp || '') + ' · ' + esc(d.ecf || '') + '</small>' : '') + '</td>';
