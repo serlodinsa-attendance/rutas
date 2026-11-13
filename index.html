@@ -1793,12 +1793,12 @@ function liqDanoRow(x, i, d) {
   h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b>Piloto que entregó:</b> <input list="' + dl + '" value="' + esc(d.pe || '') + '" placeholder="' + esc(x.piloto || 'Nombre del piloto') + '" style="min-width:200px" onchange="liqPe(' + a + ',this.value)"> <small class="mut">' + (d.pe ? '' : 'vacío = piloto asignado (' + esc(x.piloto || 'sin piloto') + ')') + '</small></div>';
   (d.du || []).forEach(function (u, j) {
     var b = a + ',' + j;
-    h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span class="mut">Unidad dañada:</span><select onchange="liqDU(' + b + ',\'t\',this.value)">' + LIQ_UT.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === u.t ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+    h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span class="mut">' + (d.dv === 'dev' ? 'Unidad devuelta:' : 'Unidad dañada:') + '</span><select onchange="liqDU(' + b + ',\'t\',this.value)">' + LIQ_UT.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === u.t ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
     h += '<input value="' + esc(u.ch || '') + '" placeholder="Chasis" style="width:180px" onchange="liqDU(' + b + ',\'ch\',this.value)">';
     h += '<input value="' + esc(u.ob || '') + '" placeholder="Daño / observación" style="min-width:260px;flex:1" onchange="liqDU(' + b + ',\'ob\',this.value)">';
     h += '<button class="b sec" onclick="liqDUdel(' + b + ')">✕</button></div>';
   });
-  h += '<button class="b sec" onclick="liqDUadd(' + a + ')">+ Unidad dañada</button></td></tr>';
+  h += '<button class="b sec" onclick="liqDUadd(' + a + ')">' + (d.dv === 'dev' ? '+ Unidad devuelta' : '+ Unidad dañada') + '</button></td></tr>';
   return h;
 }
 function liqPe(id, i, v) {
@@ -1947,7 +1947,7 @@ function renderLiq() {
       if (d.dv) {
         h += '<td style="white-space:nowrap">' + (d.ft && S.cfg['limg_' + d.ft] ? '<img src="' + S.cfg['limg_' + d.ft] + '" style="height:34px;border-radius:4px;cursor:pointer;vertical-align:middle" onclick="liqVerFoto(\'' + d.ft + '\')" title="Ver foto"> ' : '') + '<label class="b sec" style="cursor:pointer;display:inline-block">📷<input type="file" accept="image/*" style="display:none" onchange="liqFoto(\'' + x.id + '\',' + i + ',this)"></label></td>';
       } else h += '<td></td>';
-      h += '<td><input value="' + esc(d.nt || '') + '" placeholder="Detalle (opcional)" style="min-width:150px" onchange="liqSet(\'' + x.id + '\',' + i + ',\'nt\',this.value)"></td></tr>'; if (d.dv === 'dsc' || d.dv === 'dcc') h += liqDanoRow(x, i, d);
+      h += '<td><input value="' + esc(d.nt || '') + '" placeholder="Detalle (opcional)" style="min-width:150px" onchange="liqSet(\'' + x.id + '\',' + i + ',\'nt\',this.value)"></td></tr>'; if (d.dv) h += liqDanoRow(x, i, d);
     });
     h += '<tr><th>Total</th><th>' + tt[0] + '</th><th>' + tt[1] + '</th><th>' + tt[2] + '</th><th>' + tt[3] + '</th><th></th><th></th><th></th><th></th></tr></table></div>';
     h += '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + (x.lq ? '<span class="mut">Liquidada por ' + esc(x.lq.p || '') + ' el ' + esc(x.lq.f || '') + '</span>' : '') + '<button class="b ' + (x.lq ? 'sec' : 'ok') + '" onclick="liqLiquidar(\'' + x.id + '\')">' + (x.lq ? 'Quitar marca de liquidada' : '✔ Marcar ruta como liquidada') + '</button><button class="b bad" onclick="liqQuitar(\'' + x.id + '\')">Quitar de liquidación</button></div></div></details>';
