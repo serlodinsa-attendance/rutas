@@ -1315,6 +1315,23 @@ function dslSolicitar() {
 function dslCancelarSol() { dslCfg().sol = null; dslGuardar('dsl_cfg'); renderDiesel(); }
 
 /* --- editar registros --- */
+function dslValeRec(id) {
+  var k0 = null, m = null;
+  Object.keys(S.cfg).forEach(function (k) {
+    if (k.indexOf('dsl_r_') !== 0 || !Array.isArray(S.cfg[k])) return;
+    S.cfg[k].forEach(function (x) { if (x.id === id) { k0 = k; m = x; } });
+  });
+  if (!m) return;
+  if (m.vr) {
+    if (!confirm('¿Quitar la marca de vale recibido?')) return;
+    delete m.vr; delete m.vrp; delete m.vrf;
+  } else {
+    var d = new Date();
+    m.vr = 1; m.vrp = (USR && USR.nombre) || '';
+    m.vrf = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  }
+  dslGuardar(k0); renderDiesel();
+}
 function dslEditar(t, id) {
   var k0 = null, m = null;
   Object.keys(S.cfg).forEach(function (k) {
@@ -1496,10 +1513,10 @@ function dslRenderRuta(mr, c) {
   orden.forEach(function (m) {
     if (m.f !== dia) { cierra(); dia = m.f; sg = 0; sq = 0; }
     sg += m.g; sq += m.q || 0;
-    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + (m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
+    rows += '<tr><td>' + dslFechaCorta(m.f) + '</td><td>' + esc(m.h || '') + '</td><td>' + esc(m.gs) + '</td><td>' + esc(m.pl) + '</td><td>' + esc(m.pi) + '</td><td>' + esc(m.r || '') + '</td><td class="r">' + dslG(m.g) + '</td><td class="r">' + (m.q ? q2(m.q) : '') + '</td><td class="r">' + (m.q && m.g ? q2(m.q / m.g) : '') + '</td><td>' + esc(m.fac || '') + (m.img && S.cfg['dsl_img_' + m.img] ? ' <img class="dthumb" src="' + S.cfg['dsl_img_' + m.img] + '" onclick="dslVerImg(\'' + m.img + '\')" title="Ver comprobante">' : '') + '</td><td>' + (m.vr ? '<button class="b" style="background:#16a34a;color:#fff" onclick="dslValeRec(\'' + m.id + '\')" title="Recibido por ' + esc(m.vrp || '') + ' el ' + esc(m.vrf || '') + '">✔ Recibido</button>' : '<button class="b sec" onclick="dslValeRec(\'' + m.id + '\')" title="Marcar vale recibido">✔</button>') + '</td><td><button class="b sec" onclick="dslEditar(\'r\',\'' + m.id + '\')" title="Editar">✏️</button> <button class="b sec" onclick="dslDel(\'r\',\'' + m.id + '\')">🗑</button></td></tr>';
   });
   cierra();
-  $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>No. vale</th><th></th></tr>' + (rows || '<tr><td colspan="11" class="mut">Sin registros.</td></tr>');
+  $('dg_tab').innerHTML = '<tr><th>Fecha</th><th>Hora</th><th>Gasolinera</th><th>Placa</th><th>Piloto</th><th>Ruta / lugar</th><th class="r">Galones</th><th class="r">Total</th><th class="r">Q / gal</th><th>No. vale</th><th>Vale recibido</th><th></th></tr>' + (rows || '<tr><td colspan="12" class="mut">Sin registros.</td></tr>');
   var pl = $('dg_pl').value, cam = pl ? dslCap(pl) : null, g = parseFloat($('dg_g').value), q = parseFloat($('dg_q').value);
   $('dg_info').textContent = (cam ? 'Capacidad de ' + cam[0] + ': ' + cam[2] + ' galones. ' : '') + (g > 0 && q > 0 ? 'Precio: ' + q2(q / g) + ' por galón.' : '');
 }
