@@ -119,7 +119,7 @@ nav button.low{color:#fca5a5}
 <header>
   <h1>Panel de Control SERLODINSA</h1>
   <nav id="nav">
-    <button data-v="rutas" class="on">Rutas Diarias</button> <button data-v="liq">Liquidación de rutas</button>
+    <button data-v="rutas" class="on">Rutas Diarias</button> <button data-v="liq">Liquidación de rutas</button> <button data-v="asis">Asistencia</button>
     <button data-v="pedidos">Pedidos</button>
     <button data-v="costos">Costos de Rutas</button>
     <button data-v="rent">Rentabilidad</button>
@@ -409,7 +409,8 @@ nav button.low{color:#fca5a5}
     <p><a id="hojaLink" href="#" target="_blank" rel="noopener">Abrir la hoja de Google con todos los datos</a></p>
   </div>
 </section>
-<section id="v-liq" class="view"> <div class="card"> <h2>Liquidación de rutas</h2> <p class="mut">Rutas enviadas desde Rutas Diarias. Abre cada ruta con la flecha para ver destino por destino y marcar devoluciones.</p> <div class="row" style="gap:8px;margin-bottom:8px"> <input id="liq_q" placeholder="Buscar por piloto, código de ruta, placa o destino..." style="flex:1;min-width:220px" oninput="LIQ.q=this.value;renderLiq()"> <input id="liq_f" type="date" title="Día" onchange="LIQ.f=this.value;renderLiq()"> <input id="liq_m" type="month" title="Mes" onchange="LIQ.m=this.value;renderLiq()"> <select id="liq_e" onchange="LIQ.e=this.value;renderLiq()"><option value="">Todas</option><option value="pend">Pendientes de liquidar</option><option value="liq">Liquidadas</option><option value="cobro">Con cobro pendiente</option></select> <button class="b sec" onclick="liqLimpiar()">Limpiar</button> </div> <div id="liq_res" class="mut"></div> </div> <div id="liq_rep"></div> <div id="liq_lista"></div> <div id="liq_vis" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:60;align-items:center;justify-content:center"><img id="liq_vis_img" alt="Foto" style="max-width:94%;max-height:94%;border-radius:8px"></div> </section> </main>
+<section id="v-liq" class="view"> <div class="card"> <h2>Liquidación de rutas</h2> <p class="mut">Rutas enviadas desde Rutas Diarias. Abre cada ruta con la flecha para ver destino por destino y marcar devoluciones.</p> <div class="row" style="gap:8px;margin-bottom:8px"> <input id="liq_q" placeholder="Buscar por piloto, código de ruta, placa o destino..." style="flex:1;min-width:220px" oninput="LIQ.q=this.value;renderLiq()"> <input id="liq_f" type="date" title="Día" onchange="LIQ.f=this.value;renderLiq()"> <input id="liq_m" type="month" title="Mes" onchange="LIQ.m=this.value;renderLiq()"> <select id="liq_e" onchange="LIQ.e=this.value;renderLiq()"><option value="">Todas</option><option value="pend">Pendientes de liquidar</option><option value="liq">Liquidadas</option><option value="cobro">Con cobro pendiente</option></select> <button class="b sec" onclick="liqLimpiar()">Limpiar</button> </div> <div id="liq_res" class="mut"></div> </div> <div id="liq_rep"></div> <div id="liq_lista"></div> <div id="liq_vis" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:60;align-items:center;justify-content:center"><img id="liq_vis_img" alt="Foto" style="max-width:94%;max-height:94%;border-radius:8px"></div> </section> <section id="v-asis" class="view"><div class="card" id="asis_box"></div></section>
+</main>
 
 <div class="modal" id="mm"><div class="box">
   <h2 id="mt" style="margin-top:0">Agregar destino</h2>
@@ -493,6 +494,32 @@ function tokBorrar_viejo() { try { localStorage.removeItem('rutas_key'); } catch
 function salir() {
   var fin = function () { tokBorrar(); location.reload(); };
   api('cerrarSesion').then(fin).catch(fin);
+}
+var ASIS = { k: '' };
+function asisKey() { try { return localStorage.getItem('asis_key') || ''; } catch (e) { return ''; } }
+function asisUrl() { return 'https://serlodinsa-attendance.github.io/asistencia/admin.html?key=' + encodeURIComponent(asisKey()); }
+function renderAsis() {
+  var vw = $('v-asis'); if (!vw || !vw.classList.contains('on')) return;
+  var k = asisKey(), box = $('asis_box');
+  if (!k) {
+    ASIS.k = '';
+    box.innerHTML = '<h2>Asistencia</h2><p class="mut">Pega una sola vez la clave de administración de asistencia para ver el cuadro aquí. Se guarda solo en este dispositivo.</p><div class="row" style="gap:8px"><input id="asis_in" type="password" placeholder="Clave de asistencia" style="min-width:260px"><button class="b" onclick="asisGuardar()">Guardar</button></div>';
+    return;
+  }
+  if (ASIS.k === k && box.querySelector('iframe')) return;
+  ASIS.k = k;
+  box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px;justify-content:flex-end"><button class="b sec" onclick="window.open(asisUrl())">Abrir en pestaña nueva</button><button class="b sec" onclick="asisCambiar()">Cambiar clave</button></div><iframe id="asis_fr" style="width:100%;height:calc(100vh - 170px);min-height:500px;border:0;border-radius:10px;background:#f1f5f9"></iframe>';
+  $('asis_fr').src = asisUrl();
+}
+function asisGuardar() {
+  var x = $('asis_in').value.trim(); if (!x) return;
+  try { localStorage.setItem('asis_key', x); } catch (e) {}
+  renderAsis();
+}
+function asisCambiar() {
+  if (!confirm('¿Cambiar la clave de asistencia guardada en este dispositivo?')) return;
+  try { localStorage.removeItem('asis_key'); } catch (e) {}
+  ASIS.k = ''; renderAsis();
 }
 function aplicarRol() {
   var an = !USR || USR.rol !== 'super';
@@ -2238,7 +2265,7 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
-document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); renderLiq(); });
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); renderLiq(); renderAsis(); });
 ['lu', 'lk'].forEach(function (i) { $(i).addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); }); });
 $('leye').onclick = function () { var k = $('lk'); k.type = k.type === 'password' ? 'text' : 'password'; };
 arranque();
