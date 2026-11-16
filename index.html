@@ -363,7 +363,7 @@ nav button.low{color:#fca5a5}
     <div class="row" style="margin-top:10px">
       <label class="mut">Usuario<br><input id="us_u" style="width:130px" autocomplete="off" placeholder="ej. maria"></label>
       <label class="mut">Nombre<br><input id="us_n" style="width:180px" autocomplete="off"></label>
-      <label class="mut">Tipo<br><select id="us_r"><option value="super">Superusuario</option><option value="analista">Analista (solo Diesel)</option></select></label>
+      <label class="mut">Tipo<br><select id="us_r"><option value="super">Superusuario</option><option value="analista">Analista (solo Diesel)</option><option value="asistencia">Solo Asistencia</option></select></label>
       <label class="mut">Clave<br><input id="us_c" type="password" style="width:150px" autocomplete="new-password" placeholder="mín. 6"></label>
       <button class="b ok" onclick="usrGuardar()" style="align-self:flex-end">Guardar usuario</button>
     </div>
@@ -495,41 +495,32 @@ function salir() {
   var fin = function () { tokBorrar(); location.reload(); };
   api('cerrarSesion').then(fin).catch(fin);
 }
-var ASIS = { k: '' };
-function asisKey() { try { return localStorage.getItem('asis_key') || ''; } catch (e) { return ''; } }
-function asisUrl() { return 'https://serlodinsa-attendance.github.io/asistencia/admin.html?key=' + encodeURIComponent(asisKey()); }
+var ASIS = { k: '', cargando: false };
+function asisUrl() { return 'https://serlodinsa-attendance.github.io/asistencia/admin.html?key=' + encodeURIComponent(ASIS.k); }
 function renderAsis() {
   var vw = $('v-asis'); if (!vw || !vw.classList.contains('on')) return;
-  var k = asisKey(), box = $('asis_box');
-  if (!k) {
-    ASIS.k = '';
-    box.innerHTML = '<h2>Asistencia</h2><p class="mut">Pega una sola vez la clave de administración de asistencia para ver el cuadro aquí. Se guarda solo en este dispositivo.</p><div class="row" style="gap:8px"><input id="asis_in" type="password" placeholder="Clave de asistencia" style="min-width:260px"><button class="b" onclick="asisGuardar()">Guardar</button></div>';
-    return;
-  }
-  if (ASIS.k === k && box.querySelector('iframe')) return;
-  ASIS.k = k;
-  box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px;justify-content:flex-end"><button class="b sec" onclick="window.open(asisUrl())">Abrir en pestaña nueva</button><button class="b sec" onclick="asisCambiar()">Cambiar clave</button></div><iframe id="asis_fr" style="width:100%;height:calc(100vh - 170px);min-height:500px;border:0;border-radius:10px;background:#f1f5f9"></iframe>';
-  $('asis_fr').src = asisUrl();
-}
-function asisGuardar() {
-  var x = $('asis_in').value.trim(); if (!x) return;
-  try { localStorage.setItem('asis_key', x); } catch (e) {}
-  renderAsis();
-}
-function asisCambiar() {
-  if (!confirm('¿Cambiar la clave de asistencia guardada en este dispositivo?')) return;
-  try { localStorage.removeItem('asis_key'); } catch (e) {}
-  ASIS.k = ''; renderAsis();
+  var box = $('asis_box');
+  if ((ASIS.k && box.querySelector('iframe')) || ASIS.cargando) return;
+  ASIS.cargando = true;
+  box.innerHTML = '<p class="mut">Cargando asistencia...</p>';
+  api('asistenciaClave').then(function (k) {
+    ASIS.cargando = false; ASIS.k = k;
+    box.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px;justify-content:flex-end"><button class="b sec" onclick="window.open(asisUrl())">Abrir en pestaña nueva</button></div><iframe id="asis_fr" style="width:100%;height:calc(100vh - 170px);min-height:500px;border:0;border-radius:10px;background:#f1f5f9"></iframe>';
+    $('asis_fr').src = asisUrl();
+  }).catch(function (e) {
+    ASIS.cargando = false; ASIS.k = '';
+    box.innerHTML = '<p style="color:#b91c1c">' + esc(e.message) + '</p><button class="b" onclick="renderAsis()">Reintentar</button>';
+  });
 }
 function aplicarRol() {
-  var an = !USR || USR.rol !== 'super';
-  document.querySelectorAll('#nav button').forEach(function (b) { b.style.display = an && b.getAttribute('data-v') !== 'diesel' ? 'none' : ''; });
+  var rl = USR ? USR.rol : '', an = rl !== 'super', vis = rl === 'asistencia' ? 'asis' : 'diesel';
+  document.querySelectorAll('#nav button').forEach(function (b) { b.style.display = an && b.getAttribute('data-v') !== vis ? 'none' : ''; });
   if (an && PRIMERA) {
-    document.querySelectorAll('#nav button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-v') === 'diesel'); });
-    document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-diesel'); });
+    document.querySelectorAll('#nav button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-v') === vis); });
+    document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + vis); });
   }
-  PRIMERA = false;
-  $('usr').innerHTML = USR ? '<span>👤 ' + esc(USR.nombre) + ' <span class="rol' + (an ? ' an' : '') + '">' + (an ? 'Analista' : 'Superusuario') + '</span></span><button onclick="cambiarClaveUI()">Cambiar clave</button><button onclick="salir()">Salir</button>' : '';
+  PRIMERA = false; if (rl === 'asistencia') renderAsis();
+  $('usr').innerHTML = USR ? '<span>👤 ' + esc(USR.nombre) + ' <span class="rol' + (an ? ' an' : '') + '">' + (rl === 'asistencia' ? 'Asistencia' : an ? 'Analista' : 'Superusuario') + '</span></span><button onclick="cambiarClaveUI()">Cambiar clave</button><button onclick="salir()">Salir</button>' : '';
   if ($('cfg-adm')) { $('cfg-adm').style.display = an ? 'none' : ''; if (!an) usrCargar(); var uc = $('us_tab') && $('us_tab').closest('.card'); if (uc) uc.style.display = (USR && USR.adm) ? '' : 'none'; }
 }
 function cambiarClaveUI() {
@@ -548,7 +539,7 @@ function usrCargar() {
   api('listarUsuarios').then(function (l) {
     S.usuarios = l;
     $('us_tab').innerHTML = '<tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th></th></tr>' + l.map(function (x) {
-      return '<tr><td>' + esc(x.u) + '</td><td>' + esc(x.nombre) + '</td><td>' + (x.rol === 'super' ? 'Superusuario' : 'Analista (solo Diesel)') + '</td><td><button class="b sec" onclick="usrEditar(\'' + esc(x.u) + '\')">✏️ Editar / nueva clave</button> <button class="b sec" onclick="usrBorrar(\'' + esc(x.u) + '\')">🗑</button></td></tr>';
+      return '<tr><td>' + esc(x.u) + '</td><td>' + esc(x.nombre) + '</td><td>' + (x.rol === 'super' ? 'Superusuario' : x.rol === 'asistencia' ? 'Solo Asistencia' : 'Analista (solo Diesel)') + '</td><td><button class="b sec" onclick="usrEditar(\'' + esc(x.u) + '\')">✏️ Editar / nueva clave</button> <button class="b sec" onclick="usrBorrar(\'' + esc(x.u) + '\')">🗑</button></td></tr>';
     }).join('');
     var sel = $('bt_u'), cur = sel.value;
     sel.innerHTML = '<option value="">Todos los usuarios</option>' + l.map(function (x) { return '<option value="' + esc(x.u) + '">' + esc(x.nombre) + ' (' + esc(x.u) + ')</option>'; }).join('');
