@@ -110,6 +110,16 @@ nav button.low{color:#fca5a5}
 #usr button{border:1px solid #475569;background:transparent;color:#e2e8f0;border-radius:8px;padding:3px 8px;cursor:pointer;font-size:12px}
 .rol{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12px;background:#dbeafe;color:#1e40af}
 .rol.an{background:#fef3c7;color:#92400e}
+.dt{font-size:13px}
+.dt th{background:#0f172a;color:#fff;text-align:left;padding:8px 10px;font-weight:600;white-space:nowrap}
+.dt td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.dt td.n{text-align:right;white-space:nowrap}
+.dt td small{display:block;color:var(--mut);font-size:11px}
+.dt tfoot td{background:#f8fafc}
+.dacc{white-space:nowrap}.dacc .b{padding:5px 8px;font-size:12px}
+.dvenc{color:var(--bad);font-weight:700}
+.dpb{height:4px;background:#e2e8f0;border-radius:3px;margin-top:3px}.dpb i{display:block;height:100%;background:var(--ok);border-radius:3px}
+.dtag.ok{color:var(--ok);font-weight:700;font-size:12px}
 </style>
 </head>
 <body>
@@ -119,7 +129,7 @@ nav button.low{color:#fca5a5}
 <header>
   <h1>Panel de Control SERLODINSA</h1>
   <nav id="nav">
-    <button data-v="rutas" class="on">Rutas Diarias</button> <button data-v="liq">Liquidación de rutas</button> <button data-v="asis">Asistencia</button>
+    <button data-v="rutas" class="on">Rutas Diarias</button> <button data-v="liq">Liquidación de rutas</button> <button data-v="asis">Asistencia</button> <button data-v="ded">Deducciones</button>
     <button data-v="pedidos">Pedidos</button>
     <button data-v="costos">Costos de Rutas</button>
     <button data-v="rent">Rentabilidad</button>
@@ -410,6 +420,7 @@ nav button.low{color:#fca5a5}
   </div>
 </section>
 <section id="v-liq" class="view"> <div class="card"> <h2>Liquidación de rutas</h2> <p class="mut">Rutas enviadas desde Rutas Diarias. Abre cada ruta con la flecha para ver destino por destino y marcar devoluciones.</p> <div class="row" style="gap:8px;margin-bottom:8px"> <input id="liq_q" placeholder="Buscar por piloto, código de ruta, placa o destino..." style="flex:1;min-width:220px" oninput="LIQ.q=this.value;renderLiq()"> <input id="liq_f" type="date" title="Día" onchange="LIQ.f=this.value;renderLiq()"> <input id="liq_m" type="month" title="Mes" onchange="LIQ.m=this.value;renderLiq()"> <select id="liq_e" onchange="LIQ.e=this.value;renderLiq()"><option value="">Todas</option><option value="pend">Pendientes de liquidar</option><option value="liq">Liquidadas</option><option value="cobro">Con cobro pendiente</option></select> <button class="b sec" onclick="liqLimpiar()">Limpiar</button> </div> <div id="liq_res" class="mut"></div> </div> <div id="liq_rep"></div> <div id="liq_lista"></div> <div id="liq_vis" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:60;align-items:center;justify-content:center"><img id="liq_vis_img" alt="Foto" style="max-width:94%;max-height:94%;border-radius:8px"></div> </section> <section id="v-asis" class="view"><div class="card" id="asis_box"></div></section>
+<section id="v-ded" class="view"><div id="ded_box"></div></section>
 </main>
 
 <div class="modal" id="mm"><div class="box">
@@ -2256,9 +2267,243 @@ document.getElementById('nav').addEventListener('click', function (e) {
   document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + b.getAttribute('data-v')); });
 });
 $('dq').addEventListener('input', renderDicc);
-document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); renderLiq(); renderAsis(); });
+document.getElementById('nav').addEventListener('click', function () { renderCostos(); renderTarifario(); renderRent(); renderDiesel(); renderLiq(); renderAsis(); renderDed(); });
 ['lu', 'lk'].forEach(function (i) { $(i).addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); }); });
 $('leye').onclick = function () { var k = $('lk'); k.type = k.type === 'password' ? 'text' : 'password'; };
+/* ---------- Deducciones ---------- */
+var DED = { lista: [], ver: 'activas', tipo: '', q: '', ok: false, pend: null };
+var DED_TIPOS = ['Daños', 'Préstamo personal', 'Mecánica', 'Otro'];
+function dedQ(n) { return 'Q' + Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function dedDesc(d) { var t = 0; (d.pagos || []).forEach(function (p) { t += Number(p.monto) || 0; }); return Math.round(t * 100) / 100; }
+function dedSaldo(d) { return Math.max(0, Math.round((d.total - dedDesc(d)) * 100) / 100); }
+function dedFecha(iso) { if (!iso) return '—'; var p = String(iso).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso; }
+function dedIsoDe(y, m, d) { return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2); }
+function dedQuincenaDesde(iso) {
+  var p = iso.split('-'), y = +p[0], m = +p[1], d = +p[2], fin = new Date(y, m, 0).getDate();
+  return d <= 15 ? dedIsoDe(y, m, 15) : dedIsoDe(y, m, fin);
+}
+function dedSigQ(iso) {
+  var p = iso.split('-'), y = +p[0], m = +p[1], d = +p[2], fin = new Date(y, m, 0).getDate();
+  if (d < 15) return dedIsoDe(y, m, 15);
+  if (d < fin) return dedIsoDe(y, m, fin);
+  var m2 = m + 1, y2 = y;
+  if (m2 > 12) { m2 = 1; y2++; }
+  return dedIsoDe(y2, m2, 15);
+}
+function dedPorId(id) { for (var i = 0; i < DED.lista.length; i++) if (DED.lista[i].id === id) return DED.lista[i]; return null; }
+function renderDed() { var vw = $('v-ded'); if (!vw || !vw.classList.contains('on')) return; if (DED.ok) dedPintar(); dedCargar(); }
+
+function dedCargar() {
+  var box = $('ded_box');
+  if (!box) return;
+  if (!DED.ok) box.innerHTML = '<div class="card">Cargando deducciones...</div>';
+  return api('dedLista').then(function (l) { DED.lista = l || []; DED.ok = true; dedPintar(); })
+    .catch(function (e) {
+      box.innerHTML = '<div class="card">No se pudo cargar: ' + esc(e.message) + ' <button class="b sec" onclick="dedCargar()">Reintentar</button></div>';
+    });
+}
+function dedSet(l) { DED.lista = l || []; DED.ok = true; dedPintar(); }
+
+function dedPintar() {
+  var box = $('ded_box');
+  if (!box) return;
+  var L = DED.lista, hoy = hoyISO();
+  var act = L.filter(function (d) { return dedSaldo(d) > 0; });
+  var pend = 0, pil = {};
+  act.forEach(function (d) { pend += dedSaldo(d); pil[norm(d.piloto)] = 1; });
+  var prox = '', montoProx = 0, nProx = 0;
+  act.forEach(function (d) { if (d.siguiente && (!prox || d.siguiente < prox)) prox = d.siguiente; });
+  if (prox) act.forEach(function (d) { if (d.siguiente && d.siguiente <= prox) { montoProx += Math.min(d.cuota, dedSaldo(d)); nProx++; } });
+  var tipos = '<option value="">Todos los tipos</option>' + DED_TIPOS.map(function (t) { return '<option' + (DED.tipo === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+  var h = '<div class="bar">' +
+    '<div class="kpi"><b>' + dedQ(pend) + '</b><span>Por cobrar</span></div>' +
+    '<div class="kpi"><b>' + act.length + '</b><span>Deducciones activas</span></div>' +
+    '<div class="kpi"><b>' + Object.keys(pil).length + '</b><span>Pilotos con deuda</span></div>' +
+    '<div class="kpi' + (prox && prox < hoy ? ' alert' : '') + '"><b>' + (prox ? dedQ(montoProx) : '—') + '</b><span>' + (prox ? 'Descuento del ' + dedFecha(prox) + ' (' + nProx + ')' : 'Sin descuentos pendientes') + '</span></div>' +
+    '<div style="margin-left:auto" class="row">' +
+    '<button class="b ok" onclick="dedForm()">+ Nueva deducción</button>' +
+    '<button class="b sec" onclick="dedQuincenaUI()"' + (prox ? '' : ' disabled') + '>✓ Aplicar quincena</button></div></div>' +
+    '<div class="row" style="margin-bottom:10px">' +
+    '<input id="ded_q" placeholder="Buscar piloto o concepto" value="' + esc(DED.q) + '" oninput="DED.q=this.value;dedPintarTabla()" style="min-width:220px">' +
+    '<select id="ded_tipo" onchange="DED.tipo=this.value;dedPintar()">' + tipos + '</select>' +
+    '<select id="ded_ver" onchange="DED.ver=this.value;dedPintar()"><option value="activas"' + (DED.ver === 'activas' ? ' selected' : '') + '>Activas</option><option value="liquidadas"' + (DED.ver === 'liquidadas' ? ' selected' : '') + '>Liquidadas</option><option value="todas"' + (DED.ver === 'todas' ? ' selected' : '') + '>Todas</option></select></div>' +
+    '<div id="ded_tabla"></div>';
+  box.innerHTML = h;
+  dedPintarTabla();
+}
+
+function dedPintarTabla() {
+  var cont = $('ded_tabla');
+  if (!cont) return;
+  var hoy = hoyISO();
+  var vis = DED.lista.filter(function (d) {
+    var a = dedSaldo(d) > 0;
+    if (DED.ver === 'activas' && !a) return false;
+    if (DED.ver === 'liquidadas' && a) return false;
+    if (DED.tipo && d.tipo !== DED.tipo) return false;
+    if (DED.q && norm(d.piloto + ' ' + d.concepto).indexOf(norm(DED.q)) < 0) return false;
+    return true;
+  }).sort(function (a, b) { var x = a.siguiente || '9', y = b.siguiente || '9'; return x < y ? -1 : x > y ? 1 : norm(a.piloto) < norm(b.piloto) ? -1 : 1; });
+  if (!vis.length) { cont.innerHTML = '<div class="card" style="color:var(--mut)">No hay deducciones para mostrar.</div>'; return; }
+  var tot = 0, rows = vis.map(function (d) {
+    var s = dedSaldo(d), pg = dedDesc(d), pct = d.total > 0 ? Math.min(100, Math.round(pg * 100 / d.total)) : 0, a = s > 0;
+    tot += s;
+    var modo = d.modo === 'quincenal' ? dedQ(d.cuota) + ' c/quincena' + (a ? '<small>faltan ' + Math.ceil(s / d.cuota) + ' quincena(s)</small>' : '') : d.modo === 'completo' ? 'Monto completo' : 'En una fecha';
+    var vence = a && d.siguiente && d.siguiente < hoy;
+    var acc = a ? '<button class="b ok" title="Descontar esta quincena" onclick="dedPagoUI(\'' + d.id + '\',true)">✓ Descontar</button> <button class="b sec" onclick="dedPagoUI(\'' + d.id + '\',false)">Abono</button> ' : '<span class="dtag ok">Liquidada</span> ';
+    acc += '<button class="b sec" onclick="dedHistUI(\'' + d.id + '\')">Historial</button> <button class="b sec" onclick="dedForm(\'' + d.id + '\')">Editar</button> <button class="b bad" onclick="dedBorrarUI(\'' + d.id + '\')">Borrar</button>';
+    return '<tr><td><b>' + esc(d.piloto) + '</b></td><td>' + esc(d.tipo) + '</td><td>' + esc(d.concepto) + (d.nota ? '<small>' + esc(d.nota) + '</small>' : '') + '</td>' +
+      '<td class="n">' + dedQ(d.total) + '</td><td class="n">' + dedQ(pg) + '<div class="dpb"><i style="width:' + pct + '%"></i></div></td>' +
+      '<td class="n"><b>' + dedQ(s) + '</b></td><td>' + modo + '</td>' +
+      '<td' + (vence ? ' class="dvenc"' : '') + '>' + (a ? dedFecha(d.siguiente) + (vence ? '<small>vencida</small>' : '') : '—') + '</td><td class="dacc">' + acc + '</td></tr>';
+  }).join('');
+  cont.innerHTML = '<div style="overflow-x:auto"><table class="dt"><thead><tr><th>Piloto</th><th>Tipo</th><th>Daño u otros</th><th>Total</th><th>Descontado</th><th>Monto restante por cobrar</th><th>Descuento</th><th>Fecha de descuento</th><th></th></tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td colspan="5" style="text-align:right">Total por cobrar (lo mostrado)</td><td class="n"><b>' + dedQ(tot) + '</b></td><td colspan="3"></td></tr></tfoot></table></div>';
+}
+
+/* --- ventanas --- */
+function dedModal(html, ancho) {
+  var m = $('ded_m');
+  if (!m) { m = document.createElement('div'); m.id = 'ded_m'; m.className = 'modal'; m.innerHTML = '<div class="box"></div>'; document.body.appendChild(m); }
+  var bx = m.firstChild; bx.style.maxWidth = (ancho || 440) + 'px'; bx.innerHTML = html;
+  m.classList.add('on');
+}
+function dedCerrar() { var m = $('ded_m'); if (m) m.classList.remove('on'); }
+function dedErr(t) { var e = $('ded_err'); if (e) e.textContent = t || ''; }
+function dedBusy(b, on) { if (b) { b.disabled = on; } }
+
+function dedForm(id) {
+  var d = id ? dedPorId(id) : null, hoy = hoyISO();
+  var pil = {};
+  DED.lista.forEach(function (x) { pil[x.piloto] = 1; });
+  try { if (typeof liqPilotos === 'function') { var lp = liqPilotos(); (lp || []).forEach(function (n) { if (n) pil[typeof n === 'string' ? n : (n.nombre || n.n || '')] = 1; }); } } catch (e) {}
+  var dl = Object.keys(pil).filter(Boolean).sort().map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
+  var t = d ? d.total : '', modo = d ? d.modo : 'quincenal', sig = d && d.siguiente ? d.siguiente : dedQuincenaDesde(hoy);
+  var cu = d ? d.cuota : '', nq = (d && d.modo === 'quincenal' && d.cuota > 0) ? Math.ceil(d.total / d.cuota) : '';
+  dedModal('<h3 style="margin:0 0 6px">' + (d ? 'Editar deducción' : 'Nueva deducción') + '</h3>' +
+    '<label>Piloto</label><input id="df_pil" list="df_pl" value="' + esc(d ? d.piloto : '') + '" style="width:100%" autocomplete="off"><datalist id="df_pl">' + dl + '</datalist>' +
+    '<label>Tipo</label><select id="df_tipo" style="width:100%">' + DED_TIPOS.map(function (x) { return '<option' + (d && d.tipo === x ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>' +
+    '<label>Concepto (ej. Daños Fuso, Préstamo, Reparación)</label><input id="df_con" value="' + esc(d ? d.concepto : '') + '" style="width:100%">' +
+    '<label>Total final a descontar (Q)</label><input id="df_tot" type="number" min="0" step="0.01" value="' + t + '" style="width:100%" oninput="dedForm2(\'t\')">' +
+    '<label>Forma de descuento</label><select id="df_modo" style="width:100%" onchange="dedForm2(\'m\')"><option value="completo"' + (modo === 'completo' ? ' selected' : '') + '>Monto completo</option><option value="fecha"' + (modo === 'fecha' ? ' selected' : '') + '>En una fecha específica</option><option value="quincenal"' + (modo === 'quincenal' ? ' selected' : '') + '>Por quincenas</option></select>' +
+    '<div id="df_q" style="display:' + (modo === 'quincenal' ? 'block' : 'none') + '"><div class="row" style="gap:8px"><div style="flex:1"><label>Cantidad de quincenas</label><input id="df_nq" type="number" min="1" step="1" value="' + nq + '" style="width:100%" oninput="dedForm2(\'n\')"></div><div style="flex:1"><label>Descuento por quincena (Q)</label><input id="df_cu" type="number" min="0" step="0.01" value="' + cu + '" style="width:100%" oninput="dedForm2(\'c\')"></div></div></div>' +
+    '<label id="df_fl">' + (modo === 'quincenal' ? 'Primera quincena a descontar' : 'Fecha del descuento') + '</label><input id="df_sig" type="date" value="' + sig + '" style="width:100%" oninput="dedForm2(\'f\')">' +
+    '<div id="df_res" style="font-size:12px;color:var(--mut);margin-top:6px"></div>' +
+    '<label>Nota (opcional)</label><input id="df_nota" value="' + esc(d ? d.nota || '' : '') + '" style="width:100%">' +
+    '<div id="ded_err" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="dedCerrar()">Cancelar</button><button class="b ok" id="df_ok" onclick="dedGuardarForm(' + (d ? '\'' + d.id + '\'' : '') + ')">Guardar</button></div>');
+  dedForm2('f');
+}
+function dedForm2(w) {
+  var tot = parseFloat($('df_tot').value) || 0, modo = $('df_modo').value, nq = $('df_nq'), cu = $('df_cu');
+  $('df_q').style.display = modo === 'quincenal' ? 'block' : 'none';
+  $('df_fl').textContent = modo === 'quincenal' ? 'Primera quincena a descontar' : 'Fecha del descuento';
+  if (modo === 'quincenal') {
+    if ((w === 'n' || w === 't' || w === 'm') && tot > 0 && parseInt(nq.value, 10) > 0) cu.value = (Math.ceil(tot / parseInt(nq.value, 10) * 100) / 100);
+    else if (w === 'c' && tot > 0 && parseFloat(cu.value) > 0) nq.value = Math.ceil(tot / parseFloat(cu.value) - 1e-9);
+  }
+  var r = '', sig = $('df_sig').value;
+  if (tot > 0 && sig) {
+    if (modo === 'quincenal') {
+      var c = parseFloat(cu.value) || 0;
+      if (c > 0) {
+        var n = Math.ceil(tot / c - 1e-9), f = sig;
+        for (var i = 1; i < n; i++) f = dedSigQ(f);
+        r = n + ' quincena(s) de ' + dedQ(Math.min(c, tot)) + (n > 1 && Math.round((tot - c * (n - 1)) * 100) / 100 !== c ? ' (la última de ' + dedQ(Math.round((tot - c * (n - 1)) * 100) / 100) + ')' : '') + '. Termina de pagarse el ' + dedFecha(f) + '.';
+      }
+    } else r = 'Se descuenta ' + dedQ(tot) + ' el ' + dedFecha(sig) + '.';
+  }
+  $('df_res').textContent = r;
+}
+function dedGuardarForm(id) {
+  var o = { id: id || '', piloto: $('df_pil').value.trim(), tipo: $('df_tipo').value, concepto: $('df_con').value.trim(), total: parseFloat($('df_tot').value) || 0, modo: $('df_modo').value, cuota: parseFloat($('df_cu').value) || 0, siguiente: $('df_sig').value, nota: $('df_nota').value.trim() };
+  if (!o.piloto) { dedErr('Escribe el nombre del piloto.'); return; }
+  if (!(o.total > 0)) { dedErr('Escribe el total a descontar.'); return; }
+  if (o.modo === 'quincenal' && !(o.cuota > 0)) { dedErr('Escribe la cantidad de quincenas o cuánto descontar por quincena.'); return; }
+  if (!o.siguiente) { dedErr('Elige la fecha.'); return; }
+  var b = $('df_ok'); dedBusy(b, true); dedErr('Guardando...');
+  api('dedGuardar', o).then(function (l) { dedSet(l); dedCerrar(); }).catch(function (e) { dedBusy(b, false); dedErr(e.message); });
+}
+
+function dedPagoUI(id, regular) {
+  var d = dedPorId(id); if (!d) return;
+  var s = dedSaldo(d), m = regular ? Math.min(d.cuota, s) : '', f = regular && d.siguiente ? d.siguiente : hoyISO();
+  dedModal('<h3 style="margin:0 0 6px">' + (regular ? 'Descontar quincena' : 'Abono extra') + '</h3>' +
+    '<div style="font-size:13px"><b>' + esc(d.piloto) + '</b> · ' + esc(d.concepto) + '<br>Saldo actual: <b>' + dedQ(s) + '</b></div>' +
+    '<label>Monto a descontar (Q)</label><input id="dp_m" type="number" min="0" step="0.01" value="' + m + '" style="width:100%" oninput="dedPagoPrev(\'' + id + '\')">' +
+    '<label>Fecha del descuento</label><input id="dp_f" type="date" value="' + f + '" style="width:100%">' +
+    '<label>Nota (opcional)</label><input id="dp_n" style="width:100%">' +
+    '<div id="dp_p" style="font-size:12px;color:var(--mut);margin-top:6px"></div>' +
+    '<div id="ded_err" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="dedCerrar()">Cancelar</button><button class="b ok" id="dp_ok" onclick="dedPagoGo(\'' + id + '\',' + (regular ? 'true' : 'false') + ')">✓ Confirmar descuento</button></div>');
+  dedPagoPrev(id);
+}
+function dedPagoPrev(id) {
+  var d = dedPorId(id), m = parseFloat($('dp_m').value) || 0, s = dedSaldo(d), e = $('dp_p');
+  if (!(m > 0)) { e.textContent = ''; return; }
+  var r = Math.max(0, Math.round((s - Math.min(m, s)) * 100) / 100);
+  e.textContent = r > 0 ? 'Después de este descuento el saldo será ' + dedQ(r) + '.' : 'Con este descuento la deuda queda liquidada.';
+}
+function dedPagoGo(id, regular) {
+  var m = parseFloat($('dp_m').value) || 0, f = $('dp_f').value;
+  if (!(m > 0)) { dedErr('Escribe el monto.'); return; }
+  if (!f) { dedErr('Elige la fecha.'); return; }
+  var b = $('dp_ok'); dedBusy(b, true); dedErr('Guardando...');
+  api('dedPagar', id, m, f, regular, $('dp_n').value.trim()).then(function (l) { dedSet(l); dedCerrar(); }).catch(function (e) { dedBusy(b, false); dedErr(e.message); });
+}
+
+function dedHistUI(id) {
+  var d = dedPorId(id); if (!d) return;
+  var pg = (d.pagos || []).slice().reverse().map(function (p) {
+    return '<tr><td>' + dedFecha(p.fecha) + '</td><td class="n">' + dedQ(p.monto) + '</td><td>' + esc(p.usuario || '') + (p.nota ? '<small>' + esc(p.nota) + '</small>' : '') + '</td></tr>';
+  }).join('');
+  dedModal('<h3 style="margin:0 0 6px">Historial</h3><div style="font-size:13px"><b>' + esc(d.piloto) + '</b> · ' + esc(d.tipo) + ' · ' + esc(d.concepto) + '<br>Total ' + dedQ(d.total) + ' · Descontado ' + dedQ(dedDesc(d)) + ' · Saldo <b>' + dedQ(dedSaldo(d)) + '</b></div>' +
+    (pg ? '<table class="dt" style="margin-top:10px"><thead><tr><th>Fecha</th><th>Monto</th><th>Registró</th></tr></thead><tbody>' + pg + '</tbody></table>' : '<div style="color:var(--mut);margin-top:10px">Todavía no se ha descontado nada.</div>') +
+    '<div id="ded_err" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+    '<div class="row" style="justify-content:space-between;margin-top:8px">' + ((d.pagos || []).length ? '<button class="b bad" id="dh_un" onclick="dedDeshacerGo(\'' + id + '\')">Deshacer último descuento</button>' : '<span></span>') + '<button class="b sec" onclick="dedCerrar()">Cerrar</button></div>', 480);
+}
+function dedDeshacerGo(id) {
+  var b = $('dh_un');
+  if (b.getAttribute('data-c') !== '1') { b.setAttribute('data-c', '1'); b.textContent = '¿Seguro? Toca otra vez para deshacer'; return; }
+  dedBusy(b, true); dedErr('Guardando...');
+  api('dedDeshacer', id).then(function (l) { dedSet(l); dedHistUI(id); }).catch(function (e) { dedBusy(b, false); dedErr(e.message); });
+}
+function dedBorrarUI(id) {
+  var d = dedPorId(id); if (!d) return;
+  dedModal('<h3 style="margin:0 0 6px">Borrar deducción</h3><div style="font-size:13px">¿Borrar la deducción de <b>' + esc(d.piloto) + '</b> (' + esc(d.concepto) + ')?<br>Saldo pendiente: <b>' + dedQ(dedSaldo(d)) + '</b>. Se pierde también su historial y no se puede deshacer.</div>' +
+    '<div id="ded_err" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="dedCerrar()">Cancelar</button><button class="b bad" id="db_ok" onclick="dedBorrarGo(\'' + id + '\')">Sí, borrar</button></div>');
+}
+function dedBorrarGo(id) {
+  var b = $('db_ok'); dedBusy(b, true); dedErr('Borrando...');
+  api('dedBorrar', id).then(function (l) { dedSet(l); dedCerrar(); }).catch(function (e) { dedBusy(b, false); dedErr(e.message); });
+}
+
+function dedQuincenaUI() {
+  var hoy = hoyISO(), prox = '';
+  DED.lista.forEach(function (d) { if (dedSaldo(d) > 0 && d.siguiente && (!prox || d.siguiente < prox)) prox = d.siguiente; });
+  if (!prox) return;
+  dedModal('<h3 style="margin:0 0 6px">Aplicar quincena</h3><div style="font-size:13px">Se descuenta la cuota de todos los que tengan fecha igual o anterior a la quincena elegida.</div>' +
+    '<label>Quincena a aplicar</label><input id="dq_f" type="date" value="' + prox + '" style="width:100%" oninput="dedQuincenaLista()">' +
+    '<div id="dq_l" style="margin-top:8px;max-height:260px;overflow:auto"></div>' +
+    '<div id="ded_err" style="color:var(--bad);font-size:12px;min-height:16px;margin-top:6px"></div>' +
+    '<div class="row" style="justify-content:flex-end;margin-top:8px"><button class="b sec" onclick="dedCerrar()">Cancelar</button><button class="b ok" id="dq_ok" onclick="dedQuincenaGo()">✓ Aplicar a todos</button></div>', 480);
+  dedQuincenaLista();
+}
+function dedQuincenaLista() {
+  var f = $('dq_f').value, tot = 0, n = 0, rows = '';
+  DED.lista.forEach(function (d) {
+    var s = dedSaldo(d);
+    if (s > 0 && d.siguiente && f && d.siguiente <= f) { var m = Math.min(d.cuota, s); tot += m; n++; rows += '<tr><td>' + esc(d.piloto) + '<small>' + esc(d.concepto) + '</small></td><td class="n">' + dedQ(m) + '</td><td class="n">' + dedQ(s - m) + '</td></tr>'; }
+  });
+  $('dq_l').innerHTML = n ? '<table class="dt"><thead><tr><th>Piloto</th><th>Descuento</th><th>Quedará</th></tr></thead><tbody>' + rows + '</tbody><tfoot><tr><td><b>Total (' + n + ')</b></td><td class="n"><b>' + dedQ(tot) + '</b></td><td></td></tr></tfoot></table>' : '<div style="color:var(--mut)">Nadie tiene descuento pendiente hasta esa fecha.</div>';
+  $('dq_ok').disabled = !n;
+}
+function dedQuincenaGo() {
+  var f = $('dq_f').value; if (!f) { dedErr('Elige la fecha.'); return; }
+  var b = $('dq_ok'); dedBusy(b, true); dedErr('Guardando...');
+  api('dedAplicarQuincena', f).then(function (l) { dedSet(l); dedCerrar(); }).catch(function (e) { dedBusy(b, false); dedErr(e.message); });
+}
 arranque();
 </script>
 </body>
