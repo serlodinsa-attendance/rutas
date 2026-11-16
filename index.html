@@ -1686,9 +1686,10 @@ function editarManual(d) {
   $('mm').classList.add('on');
 }
 function cerrarManual() { $('mm').classList.remove('on'); }
+function lineaLote(l) { var m = /^(.*?)\s+(\d+(?:\s+\d+){0,3})\s*$/.exec(l.trim()); return m ? [m[1]].concat(m[2].split(/\s+/)) : [l]; }
 function agregarLoteManual() {
   var nRuta = Number($('m_r').value), suma = $('m_bm').value === 's', nuevos = 0, cambiados = 0, salt = [];
-  var filas = $('m_bulk').value.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim() !== ''; }).map(function (l) { return l.indexOf('\t') >= 0 ? l.split('\t') : l.split(';'); });
+  var filas = $('m_bulk').value.replace(/\r/g, '').split('\n').filter(function (l) { return l.trim() !== ''; }).map(function (l) { return l.indexOf('\t') >= 0 ? l.split('\t') : (l.indexOf(';') >= 0 ? l.split(';') : lineaLote(l)); });
   if (!filas.length) { $('m_msg').textContent = 'Pega los destinos primero.'; return; }
   if (/destino/i.test(String(filas[0][0] || ''))) filas.shift();
   filas.forEach(function (c) {
@@ -1976,7 +1977,7 @@ function renderLiq() {
 }
 function guardarManual(otro) {
   var d = $('m_d').value.trim();
-  if (!d) { $('m_msg').textContent = 'Escribe el destino.'; return; }
+  if (!d) { if ($('m_bulk').value.trim()) { agregarLoteManual(); return; } $('m_msg').textContent = 'Escribe el destino.'; return; }
   var u = [num($('m_m').value), num($('m_t').value), num($('m_q').value), num($('m_k').value)];
   if (!u[0] && !u[1] && !u[2] && !u[3]) { $('m_msg').textContent = 'Pon al menos una unidad.'; return; }
   var p = pedidoDe(d), nRuta = Number($('m_r').value);
