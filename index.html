@@ -373,7 +373,7 @@ nav button.low{color:#fca5a5}
     <div class="row" style="margin-top:10px">
       <label class="mut">Usuario<br><input id="us_u" style="width:130px" autocomplete="off" placeholder="ej. maria"></label>
       <label class="mut">Nombre<br><input id="us_n" style="width:180px" autocomplete="off"></label>
-      <label class="mut">Tipo<br><select id="us_r"><option value="super">Superusuario</option><option value="analista">Analista (solo Diesel)</option><option value="asistencia">Solo Asistencia</option><option value="liquidacion">Solo Liquidación</option></select></label>
+      <label class="mut">Tipo<br><select id="us_r"><option value="super">Superusuario</option><option value="analista">Analista (solo Diesel)</option><option value="asistencia">Solo Asistencia</option><option value="liquidacion">Solo Liquidación</option><option value="deducciones">Solo Deducciones</option></select></label>
       <label class="mut">Clave<br><input id="us_c" type="password" style="width:150px" autocomplete="new-password" placeholder="mín. 6"></label>
       <button class="b ok" onclick="usrGuardar()" style="align-self:flex-end">Guardar usuario</button>
     </div>
@@ -524,14 +524,14 @@ function renderAsis() {
   });
 }
 function aplicarRol() {
-  var rl = USR ? USR.rol : '', an = rl !== 'super', vis = rl === 'asistencia' ? 'asis' : rl === 'liquidacion' ? 'liq' : 'diesel';
+  var rl = USR ? USR.rol : '', an = rl !== 'super', vis = rl === 'asistencia' ? 'asis' : rl === 'liquidacion' ? 'liq' : rl === 'deducciones' ? 'ded' : 'diesel';
   document.querySelectorAll('#nav button').forEach(function (b) { b.style.display = an && b.getAttribute('data-v') !== vis ? 'none' : ''; });
   if (an && PRIMERA) {
     document.querySelectorAll('#nav button').forEach(function (x) { x.classList.toggle('on', x.getAttribute('data-v') === vis); });
     document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('on', v.id === 'v-' + vis); });
   }
-  PRIMERA = false; if (rl === 'asistencia') renderAsis(); if (rl === 'liquidacion') renderLiq();
-  $('usr').innerHTML = USR ? '<span>👤 ' + esc(USR.nombre) + ' <span class="rol' + (an ? ' an' : '') + '">' + (rl === 'asistencia' ? 'Asistencia' : rl === 'liquidacion' ? 'Liquidación' : an ? 'Analista' : 'Superusuario') + '</span></span><button onclick="cambiarClaveUI()">Cambiar clave</button><button onclick="salir()">Salir</button>' : '';
+  PRIMERA = false; if (rl === 'asistencia') renderAsis(); if (rl === 'liquidacion') renderLiq(); if (rl === 'deducciones') dedCargar();
+  $('usr').innerHTML = USR ? '<span>👤 ' + esc(USR.nombre) + ' <span class="rol' + (an ? ' an' : '') + '">' + (rl === 'asistencia' ? 'Asistencia' : rl === 'liquidacion' ? 'Liquidación' : rl === 'deducciones' ? 'Deducciones' : an ? 'Analista' : 'Superusuario') + '</span></span><button onclick="cambiarClaveUI()">Cambiar clave</button><button onclick="salir()">Salir</button>' : '';
   if ($('cfg-adm')) { $('cfg-adm').style.display = an ? 'none' : ''; if (!an) usrCargar(); var uc = $('us_tab') && $('us_tab').closest('.card'); if (uc) uc.style.display = (USR && USR.adm) ? '' : 'none'; }
 }
 function cambiarClaveUI() {
@@ -550,7 +550,7 @@ function usrCargar() {
   api('listarUsuarios').then(function (l) {
     S.usuarios = l;
     $('us_tab').innerHTML = '<tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th></th></tr>' + l.map(function (x) {
-      return '<tr><td>' + esc(x.u) + '</td><td>' + esc(x.nombre) + '</td><td>' + (x.rol === 'super' ? 'Superusuario' : x.rol === 'asistencia' ? 'Solo Asistencia' : x.rol === 'liquidacion' ? 'Solo Liquidación' : 'Analista (solo Diesel)') + '</td><td><button class="b sec" onclick="usrEditar(\'' + esc(x.u) + '\')">✏️ Editar / nueva clave</button> <button class="b sec" onclick="usrBorrar(\'' + esc(x.u) + '\')">🗑</button></td></tr>';
+      return '<tr><td>' + esc(x.u) + '</td><td>' + esc(x.nombre) + '</td><td>' + (x.rol === 'super' ? 'Superusuario' : x.rol === 'asistencia' ? 'Solo Asistencia' : x.rol === 'liquidacion' ? 'Solo Liquidación' : x.rol === 'deducciones' ? 'Solo Deducciones' : 'Analista (solo Diesel)') + '</td><td><button class="b sec" onclick="usrEditar(\'' + esc(x.u) + '\')">✏️ Editar / nueva clave</button> <button class="b sec" onclick="usrBorrar(\'' + esc(x.u) + '\')">🗑</button></td></tr>';
     }).join('');
     var sel = $('bt_u'), cur = sel.value;
     sel.innerHTML = '<option value="">Todos los usuarios</option>' + l.map(function (x) { return '<option value="' + esc(x.u) + '">' + esc(x.nombre) + ' (' + esc(x.u) + ')</option>'; }).join('');
