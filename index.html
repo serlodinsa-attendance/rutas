@@ -809,7 +809,7 @@ function borrarRuta(n) {
   var a = S.cfg.sinAuto || [];
   r.destinos.forEach(function (d) { if (a.indexOf(norm(d)) < 0) a.push(norm(d)); });
   S.cfg.sinAuto = a; api('guardarConfig', { sinAuto: a }).catch(function () {});
-  S.rutas = S.rutas.filter(function (x) { return x.n !== n; });
+  S.rutas = S.rutas.filter(function (x) { return x.n !== n; }); compactarRutas();
   renderTodo(); guardarTodo();
 }
 function descargarAsignacion() {
