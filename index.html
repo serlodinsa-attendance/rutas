@@ -1159,7 +1159,6 @@ function rentAuto() {
 }
 function renderRent() {
   if (!$('rent')) return;
-  rentAuto();
   var d = rentData().slice().sort(function (a, b) { return a[0] < b[0] ? 1 : -1; });
   var hoy = hoyISO(), mesAct = hoy.slice(0, 7), mI = 0, mU = 0, mD = 0, sem = {}, mes = {};
   d.forEach(function (x) {
